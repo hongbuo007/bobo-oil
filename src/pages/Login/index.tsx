@@ -1,17 +1,26 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Form, Input, Button, Typography, message, Spin } from 'antd';
-import { LockOutlined, CarOutlined } from '@ant-design/icons';
+import { LockOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const { Title, Text } = Typography;
 
 export default function LoginPage() {
-  const { isFirstTime, loading, error, checkAuth, setPassword, login } = useAuthStore();
+  const navigate = useNavigate();
+  const { isFirstTime, isLoggedIn, loading, checkAuth, setPassword, login } = useAuthStore();
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // 已登录则跳转
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isLoggedIn, navigate]);
 
   const handleSetPassword = async (values: { password: string; confirm: string }) => {
     if (values.password !== values.confirm) {
