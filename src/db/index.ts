@@ -12,6 +12,12 @@ export class BoboOilDB extends Dexie {
   constructor() {
     super('BoboOilDB');
 
+    this.version(1).stores({
+      vehicles: 'id, isActive, brand, model, createdAt',
+      refuelRecords: 'id, vehicleId, date, currentMileage, [vehicleId+date]',
+      settings: 'id, key',
+    });
+
     this.version(2).stores({
       vehicles: 'id, isActive, brand, model, createdAt',
       refuelRecords: 'id, vehicleId, date, currentMileage, [vehicleId+date]',
