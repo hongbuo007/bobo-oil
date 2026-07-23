@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { db } from '@/db';
+import { vehiclesApi, checkServer } from '@/db/api';
 import { generateUUID } from '@/utils/format';
 import type { Vehicle, VehicleFormData } from '@/models/vehicle';
 
@@ -8,8 +9,8 @@ interface VehicleState {
   currentVehicleId: string | null;
   loading: boolean;
   error: string | null;
+  useServer: boolean;
 
-  // Actions
   loadVehicles: () => Promise<void>;
   addVehicle: (data: VehicleFormData) => Promise<Vehicle>;
   updateVehicle: (id: string, data: Partial<Vehicle>) => Promise<void>;
@@ -23,18 +24,21 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
   currentVehicleId: null,
   loading: false,
   error: null,
+  useServer: false,
 
   loadVehicles: async () => {
     set({ loading: true, error: null });
     try {
-      const vehicles = await db.vehicles.orderBy('createdAt').reverse().toArray();
-      const currentId = get().currentVehicleId;
-      // 如果当前没有选中车辆且有车辆列表，自动选中第一辆
-      if (!currentId && vehicles.length > 0) {
-        set({ vehicles, currentVehicleId: vehicles[0].id, loading: false });
+      const serverOk = await checkServer();
+      let vehicles: Vehicle[];
+      if (serverOk) {
+        set({ useServer: true });
+        vehicles = await vehiclesApi.list();
       } else {
-        set({ vehicles, loading: false });
+        vehicles = await db.vehicles.orderBy('createdAt').reverse().toArray();
       }
+      const currentId = get().currentVehicleId || vehicles[0]?.id || null;
+      set({ vehicles, currentVehicleId: currentId, loading: false });
     } catch (err) {
       set({ error: '加载车辆列表失败', loading: false });
       console.error(err);
@@ -43,42 +47,43 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
 
   addVehicle: async (data: VehicleFormData) => {
     const now = new Date().toISOString();
-    const vehicle: Vehicle = {
-      ...data,
-      id: generateUUID(),
-      isActive: true,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await db.vehicles.add(vehicle);
-    const vehicles = await db.vehicles.orderBy('createdAt').reverse().toArray();
-    set({ vehicles, currentVehicleId: vehicle.id });
+    const vehicle: Vehicle = { ...data, id: generateUUID(), isActive: true, createdAt: now, updatedAt: now };
+    if (get().useServer) {
+      await vehiclesApi.create(vehicle);
+    } else {
+      await db.vehicles.add(vehicle);
+    }
+    await get().loadVehicles();
+    set({ currentVehicleId: vehicle.id });
     return vehicle;
   },
 
   updateVehicle: async (id: string, data: Partial<Vehicle>) => {
-    const now = new Date().toISOString();
-    await db.vehicles.update(id, { ...data, updatedAt: now });
-    const vehicles = await db.vehicles.orderBy('createdAt').reverse().toArray();
-    set({ vehicles });
+    if (get().useServer) {
+      await vehiclesApi.update(id, data);
+    } else {
+      await db.vehicles.update(id, { ...data, updatedAt: new Date().toISOString() });
+    }
+    await get().loadVehicles();
   },
 
   deleteVehicle: async (id: string) => {
-    await db.vehicles.delete(id);
-    // 同时删除该车辆的所有加油记录
-    await db.refuelRecords.where('vehicleId').equals(id).delete();
-    const vehicles = await db.vehicles.orderBy('createdAt').reverse().toArray();
-    const currentId = get().currentVehicleId;
-    const newCurrentId = currentId === id ? (vehicles[0]?.id ?? null) : currentId;
-    set({ vehicles, currentVehicleId: newCurrentId });
+    if (get().useServer) {
+      await vehiclesApi.remove(id);
+    } else {
+      await db.vehicles.delete(id);
+      await db.refuelRecords.where('vehicleId').equals(id).delete();
+    }
+    await get().loadVehicles();
+    const vehicles = get().vehicles;
+    const currentId = get().currentVehicleId === id ? (vehicles[0]?.id ?? null) : get().currentVehicleId;
+    set({ currentVehicleId: currentId });
   },
 
-  setCurrentVehicle: (id: string | null) => {
-    set({ currentVehicleId: id });
-  },
+  setCurrentVehicle: (id: string | null) => set({ currentVehicleId: id }),
 
   getCurrentVehicle: () => {
     const { vehicles, currentVehicleId } = get();
-    return vehicles.find((v) => v.id === currentVehicleId);
+    return vehicles.find(v => v.id === currentVehicleId);
   },
 }));

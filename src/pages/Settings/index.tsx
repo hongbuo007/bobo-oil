@@ -4,6 +4,7 @@ import { DownloadOutlined, UploadOutlined, DeleteOutlined, LockOutlined, LogoutO
 import type { UploadProps } from 'antd';
 import * as XLSX from 'xlsx';
 import { db } from '@/db';
+import { refuelsApi, checkServer } from '@/db/api';
 import { APP_NAME, APP_VERSION } from '@/config/constants';
 import { generateUUID } from '@/utils/format';
 import { calculateConsumption } from '@/services/refuelCalculator';
@@ -471,6 +472,8 @@ export default function SettingsPage() {
           message.info('没有新的记录需要导入（可能已存在）');
         } else {
           message.success(`成功导入 ${count} 条记录`);
+          // 刷新页面以重新加载数据
+          setTimeout(() => window.location.reload(), 1000);
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : '未知错误';
