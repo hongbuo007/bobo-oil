@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { db } from '@/db';
+import { generateUUID } from '@/utils/format';
 import type { Vehicle, VehicleFormData } from '@/models/vehicle';
 
 interface VehicleState {
@@ -44,7 +45,7 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
     const now = new Date().toISOString();
     const vehicle: Vehicle = {
       ...data,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       isActive: true,
       createdAt: now,
       updatedAt: now,

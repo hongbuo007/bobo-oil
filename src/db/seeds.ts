@@ -1,4 +1,5 @@
 import { db } from './index';
+import { generateUUID } from '@/utils/format';
 import type { Vehicle } from '@/models/vehicle';
 import type { RefuelRecord } from '@/models/refuel';
 
@@ -63,7 +64,7 @@ export async function seedDemoData() {
     const dateStr = recordDate.toISOString().split('T')[0];
 
     demoRecords.push({
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       vehicleId: demoVehicle.id,
       date: dateStr,
       currentMileage: item.km,

@@ -1,5 +1,18 @@
 import dayjs from 'dayjs';
 
+// 兼容的 UUID 生成函数（不依赖 crypto.randomUUID）
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // fallback：手动生成 UUID v4
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // 格式化数字，保留指定小数位
 export function formatNumber(value: number | null | undefined, decimals = 2): string {
   if (value === null || value === undefined) return '--';

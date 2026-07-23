@@ -5,6 +5,7 @@ import type { UploadProps } from 'antd';
 import * as XLSX from 'xlsx';
 import { db } from '@/db';
 import { APP_NAME, APP_VERSION } from '@/config/constants';
+import { generateUUID } from '@/utils/format';
 import type { RefuelRecord } from '@/models/refuel';
 import type { Vehicle } from '@/models/vehicle';
 import type { FuelType } from '@/models/vehicle';
@@ -118,7 +119,7 @@ async function importJSON(text: string): Promise<number> {
   // 补充缺失的字段，确保每条记录完整
   const now = new Date().toISOString();
   const completeRecords: RefuelRecord[] = records.map((r) => ({
-    id: r.id || crypto.randomUUID(),
+    id: r.id || generateUUID(),
     vehicleId: r.vehicleId || '',
     date: r.date,
     currentMileage: toNumber(r.currentMileage),
@@ -227,7 +228,7 @@ async function importExcel(file: File): Promise<number> {
 
   const now = new Date().toISOString();
   const records: RefuelRecord[] = rows.map((r) => ({
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     vehicleId: (r.vehicleId as string) || '',
     date: String(r.date || ''),
     currentMileage: toNumber(r.currentMileage),
@@ -275,7 +276,7 @@ async function importCSV(file: File): Promise<number> {
 
   const now = new Date().toISOString();
   const records: RefuelRecord[] = rows.map((r) => ({
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     vehicleId: (r.vehicleId as string) || '',
     date: String(r.date || ''),
     currentMileage: toNumber(r.currentMileage),

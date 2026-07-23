@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { db } from '@/db';
+import { generateUUID } from '@/utils/format';
 import type { RefuelRecord, RefuelFormData } from '@/models/refuel';
 import { calculateConsumption } from '@/services/refuelCalculator';
 
@@ -48,7 +49,7 @@ export const useRefuelStore = create<RefuelState>((set, get) => ({
     const now = new Date().toISOString();
     const record: RefuelRecord = {
       ...data,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       calculatedConsumption: result.consumption,
       calculatedCostPerKm: result.costPerKm,
       algorithmUsed: result.algorithm,
