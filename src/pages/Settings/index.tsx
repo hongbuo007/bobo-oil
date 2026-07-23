@@ -283,18 +283,18 @@ async function recalcMissing(vehicleId: string): Promise<number> {
   const now = new Date().toISOString();
   let calcCount = 0;
   for (let i = 0; i < records.length; i++) {
-    // 如果已有油耗，跳过
-    if (records[i].calculatedConsumption != null) continue;
+    // 如果油耗和每公里成本都有，跳过
+    if (records[i].calculatedConsumption != null && records[i].calculatedCostPerKm != null) continue;
 
     const history = records.slice(0, i);
     const result = calculateConsumption(records[i], history);
     await db.refuelRecords.update(records[i].id, {
-      calculatedConsumption: result.consumption,
-      calculatedCostPerKm: result.costPerKm,
-      algorithmUsed: result.algorithm,
+      calculatedConsumption: result.consumption ?? records[i].calculatedConsumption,
+      calculatedCostPerKm: result.costPerKm ?? records[i].calculatedCostPerKm,
+      algorithmUsed: result.algorithm ?? records[i].algorithmUsed,
       updatedAt: now,
     });
-    if (result.consumption != null) calcCount++;
+    if (result.consumption != null || result.costPerKm != null) calcCount++;
   }
   return calcCount;
 }
