@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react';
-import { Card, Button, Upload, Popconfirm, Input, message, Space, Descriptions, Typography, Tabs, Alert, Radio } from 'antd';
-import { DownloadOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Card, Button, Upload, Popconfirm, Input, message, Space, Descriptions, Typography, Form, Modal, Alert } from 'antd';
+import { DownloadOutlined, UploadOutlined, DeleteOutlined, LockOutlined, LogoutOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import * as XLSX from 'xlsx';
 import { db } from '@/db';
 import { APP_NAME, APP_VERSION } from '@/config/constants';
 import { generateUUID } from '@/utils/format';
 import { calculateConsumption } from '@/services/refuelCalculator';
+import { useAuthStore } from '@/stores/useAuthStore';
 import type { RefuelRecord } from '@/models/refuel';
 import type { Vehicle } from '@/models/vehicle';
 import type { FuelType } from '@/models/vehicle';
@@ -405,6 +406,11 @@ export default function SettingsPage() {
   const [importing, setImporting] = useState(false);
   const [clearConfirmText, setClearConfirmText] = useState('');
   const [clearPopconfirmOpen, setClearPopconfirmOpen] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [pwdSubmitting, setPwdSubmitting] = useState(false);
+  const [pwdForm] = Form.useForm();
+  const logout = useAuthStore((s) => s.logout);
+  const changePassword = useAuthStore((s) => s.changePassword);
 
   const handleExportCSV = useCallback(async () => {
     try {
@@ -576,6 +582,17 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      <Card title="账号管理">
+        <Space size="middle" wrap>
+          <Button icon={<LockOutlined />} onClick={() => setPasswordModalOpen(true)}>
+            修改密码
+          </Button>
+          <Button icon={<LogoutOutlined />} onClick={logout} danger>
+            退出登录
+          </Button>
+        </Space>
+      </Card>
+
       <Card title="关于">
         <Descriptions column={1} size="small">
           <Descriptions.Item label="应用名称">{APP_NAME}</Descriptions.Item>
@@ -586,6 +603,61 @@ export default function SettingsPage() {
           <Descriptions.Item label="数据存储">浏览器本地 IndexedDB (BoboOilDB)</Descriptions.Item>
         </Descriptions>
       </Card>
+
+      {/* 修改密码 Modal */}
+      <Modal
+        title="修改密码"
+        open={passwordModalOpen}
+        onCancel={() => { setPasswordModalOpen(false); pwdForm.resetFields(); }}
+        footer={null}
+        destroyOnClose
+      >
+        <Form
+          form={pwdForm}
+          layout="vertical"
+          onFinish={async (values) => {
+            setPwdSubmitting(true);
+            const success = await changePassword(values.oldPassword, values.newPassword);
+            setPwdSubmitting(false);
+            if (success) {
+              message.success('密码修改成功');
+              setPasswordModalOpen(false);
+              pwdForm.resetFields();
+            } else {
+              message.error('原密码错误');
+            }
+          }}
+        >
+          <Form.Item name="oldPassword" label="原密码" rules={[{ required: true, message: '请输入原密码' }]}>
+            <Input.Password placeholder="请输入原密码" />
+          </Form.Item>
+          <Form.Item name="newPassword" label="新密码" rules={[{ required: true, min: 4, message: '新密码至少4位' }]}>
+            <Input.Password placeholder="请输入新密码（至少4位）" />
+          </Form.Item>
+          <Form.Item
+            name="confirm"
+            label="确认新密码"
+            dependencies={['newPassword']}
+            rules={[
+              { required: true, message: '请确认新密码' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('newPassword') === value) return Promise.resolve();
+                  return Promise.reject(new Error('两次密码不一致'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder="请确认新密码" />
+          </Form.Item>
+          <Form.Item className="!mb-0 text-right">
+            <Space>
+              <Button onClick={() => { setPasswordModalOpen(false); pwdForm.resetFields(); }}>取消</Button>
+              <Button type="primary" htmlType="submit" loading={pwdSubmitting}>确认修改</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
