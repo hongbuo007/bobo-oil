@@ -12,6 +12,7 @@ const RefuelPage = lazy(() => import('@/pages/RefuelPage'));
 const AddRefuelPage = lazy(() => import('@/pages/AddRefuelPage'));
 const RefuelDetailPage = lazy(() => import('@/pages/RefuelDetailPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const StatisticsPage = lazy(() => import('@/pages/StatisticsPage'));
 
 function Loading() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
               <Route path="/refuel/add" element={<AddRefuelPage />} />
               <Route path="/refuel/:id" element={<RefuelDetailPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/statistics" element={<StatisticsPage />} />
             </Route>
           </Routes>
         </Suspense>

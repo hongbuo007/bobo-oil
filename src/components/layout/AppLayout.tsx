@@ -6,8 +6,7 @@ import {
   ThunderboltOutlined,
   CarOutlined,
   SettingOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import Header from '@/components/layout/Header';
 
@@ -16,6 +15,7 @@ const { Sider, Content } = Layout;
 const menuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
   { key: '/refuel', icon: <ThunderboltOutlined />, label: '加油记录' },
+  { key: '/statistics', icon: <BarChartOutlined />, label: '统计报表' },
   { key: '/vehicles', icon: <CarOutlined />, label: '车辆管理' },
   { key: '/settings', icon: <SettingOutlined />, label: '设置' },
 ];
@@ -23,7 +23,7 @@ const menuItems = [
 const tabBarItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
   { key: '/refuel', icon: <ThunderboltOutlined />, label: '加油' },
-  { key: '/vehicles', icon: <CarOutlined />, label: '车辆' },
+  { key: '/statistics', icon: <BarChartOutlined />, label: '报表' },
   { key: '/settings', icon: <SettingOutlined />, label: '设置' },
 ];
 

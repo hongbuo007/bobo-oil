@@ -154,8 +154,8 @@ async function importJSON(text: string): Promise<number> {
   // 补充缺失的字段，确保每条记录完整
   const now = new Date().toISOString();
   const completeRecords: RefuelRecord[] = records.map((r) => ({
-    id: generateUUID(),  // 始终生成新 ID，避免与已有数据冲突
-    vehicleId: r.vehicleId || defaultVehicleId,  // 自动关联到当前车辆
+    id: generateUUID(),
+    vehicleId: r.vehicleId || defaultVehicleId,
     date: excelDateToString(r.date),
     currentMileage: toNumber(r.currentMileage),
     fuelAmount: toNumber(r.fuelAmount),
@@ -166,15 +166,19 @@ async function importJSON(text: string): Promise<number> {
     isFullTank: parseBool(r.isFullTank),
     isLowFuelLight: parseBool(r.isLowFuelLight),
     isMissedPrevious: parseBool(r.isMissedPrevious),
-    calculatedConsumption: r.calculatedConsumption ?? null,
-    calculatedCostPerKm: r.calculatedCostPerKm ?? null,
-    algorithmUsed: r.algorithmUsed ?? null,
+    calculatedConsumption: null,  // 导入后统一重算
+    calculatedCostPerKm: null,
+    algorithmUsed: null,
     note: toString(r.note),
     createdAt: now,
     updatedAt: now,
   }));
 
   await db.refuelRecords.bulkAdd(completeRecords);
+
+  // 导入后重新计算所有记录的油耗
+  await recalcAll(completeRecords[0]?.vehicleId || defaultVehicleId);
+
   return completeRecords.length;
 }
 
@@ -265,6 +269,34 @@ async function getDefaultVehicleId(): Promise<string> {
   return activeVehicle?.id || '';
 }
 
+// 重新计算指定车辆所有记录的油耗
+async function recalcAll(vehicleId: string): Promise<void> {
+  if (!vehicleId) return;
+  const { calculateConsumption } = await import('@/services/refuelCalculator');
+  const records = await db.refuelRecords
+    .where('vehicleId')
+    .equals(vehicleId)
+    .sortBy('date');
+
+  const now = new Date().toISOString();
+  for (let i = 0; i < records.length; i++) {
+    const history = records.slice(0, i);
+    const result = calculateConsumption(records[i], history);
+    if (
+      records[i].calculatedConsumption !== result.consumption ||
+      records[i].calculatedCostPerKm !== result.costPerKm ||
+      records[i].algorithmUsed !== result.algorithm
+    ) {
+      await db.refuelRecords.update(records[i].id, {
+        calculatedConsumption: result.consumption,
+        calculatedCostPerKm: result.costPerKm,
+        algorithmUsed: result.algorithm,
+        updatedAt: now,
+      });
+    }
+  }
+}
+
 async function importExcel(file: File): Promise<number> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
@@ -312,6 +344,7 @@ async function importExcel(file: File): Promise<number> {
   }));
 
   await db.refuelRecords.bulkAdd(records);
+  await recalcAll(records[0]?.vehicleId || defaultVehicleId);
   return records.length;
 }
 
@@ -361,6 +394,7 @@ async function importCSV(file: File): Promise<number> {
   }));
 
   await db.refuelRecords.bulkAdd(records);
+  await recalcAll(records[0]?.vehicleId || defaultVehicleId);
   return records.length;
 }
 
