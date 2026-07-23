@@ -68,7 +68,9 @@ function parseFuelType(val: unknown): FuelType {
 }
 
 function toNumber(val: unknown): number {
-  const n = Number(val);
+  if (typeof val === 'number') return val;
+  const s = String(val ?? '').trim().replace(/[¥元,]/g, '');
+  const n = Number(s);
   return isNaN(n) ? 0 : n;
 }
 
@@ -183,6 +185,8 @@ async function importJSON(text: string): Promise<number> {
  */
 const COLUMN_MAP: Record<string, string> = {
   '日期': 'date',
+  '日期时间': 'date',
+  '时间': 'date',
   '加油日期': 'date',
   '里程': 'currentMileage',
   '里程(km)': 'currentMileage',
@@ -194,13 +198,17 @@ const COLUMN_MAP: Record<string, string> = {
   '单价': 'unitPrice',
   '单价(元/L)': 'unitPrice',
   '油价': 'unitPrice',
+  '机显单价': 'unitPrice',
   '总金额': 'totalCost',
   '总金额(元)': 'totalCost',
   '金额': 'totalCost',
   '油费': 'totalCost',
+  '机显金额': 'totalCost',
+  '实付金额': 'totalCost',
   '油品': 'fuelType',
   '油品类型': 'fuelType',
   '燃油类型': 'fuelType',
+  '油号': 'fuelType',
   '加油站': 'stationName',
   '加油站名称': 'stationName',
   '加油站点': 'stationName',
@@ -213,6 +221,7 @@ const COLUMN_MAP: Record<string, string> = {
   '亮灯': 'isLowFuelLight',
   '是否漏记': 'isMissedPrevious',
   '漏记上次': 'isMissedPrevious',
+  '漏记': 'isMissedPrevious',
   '油耗': 'calculatedConsumption',
   '油耗(L/100km)': 'calculatedConsumption',
   '百公里油耗': 'calculatedConsumption',
@@ -228,6 +237,25 @@ function mapRow(row: Record<string, unknown>): Partial<RefuelRecord> {
     const field = COLUMN_MAP[key.trim()] || key.trim();
     mapped[field] = value;
   }
+
+  // 金额字段优先级：实付金额 > 机显金额 > 总金额 > 金额 > 油费
+  const costFields = ['实付金额', '机显金额', '总金额', '金额', '油费'];
+  for (const costKey of costFields) {
+    if (row[costKey] !== undefined && row[costKey] !== null && row[costKey] !== '') {
+      mapped.totalCost = row[costKey];
+      break;
+    }
+  }
+
+  // 日期字段优先级：日期时间 > 日期 > 时间
+  const dateFields = ['日期时间', '日期', '时间'];
+  for (const dateKey of dateFields) {
+    if (row[dateKey] !== undefined && row[dateKey] !== null && row[dateKey] !== '') {
+      mapped.date = row[dateKey];
+      break;
+    }
+  }
+
   return mapped;
 }
 
