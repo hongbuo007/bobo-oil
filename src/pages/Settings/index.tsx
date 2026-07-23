@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import { db } from '@/db';
 import { APP_NAME, APP_VERSION } from '@/config/constants';
 import { generateUUID } from '@/utils/format';
+import { calculateConsumption } from '@/services/refuelCalculator';
 import type { RefuelRecord } from '@/models/refuel';
 import type { Vehicle } from '@/models/vehicle';
 import type { FuelType } from '@/models/vehicle';
@@ -272,7 +273,6 @@ async function getDefaultVehicleId(): Promise<string> {
 // 重新计算指定车辆所有记录的油耗
 async function recalcAll(vehicleId: string): Promise<void> {
   if (!vehicleId) return;
-  const { calculateConsumption } = await import('@/services/refuelCalculator');
   const records = await db.refuelRecords
     .where('vehicleId')
     .equals(vehicleId)
