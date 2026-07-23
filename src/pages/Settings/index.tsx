@@ -92,6 +92,7 @@ function validateRefuelRecord(data: unknown): data is RefuelRecord[] {
 
 async function importJSON(text: string): Promise<number> {
   const data = JSON.parse(text);
+  const defaultVehicleId = await getDefaultVehicleId();
 
   // 支持两种格式：直接数组 或 { refuelRecords: [...] }
   let records: RefuelRecord[];
@@ -119,8 +120,8 @@ async function importJSON(text: string): Promise<number> {
   // 补充缺失的字段，确保每条记录完整
   const now = new Date().toISOString();
   const completeRecords: RefuelRecord[] = records.map((r) => ({
-    id: r.id || generateUUID(),
-    vehicleId: r.vehicleId || '',
+    id: generateUUID(),  // 始终生成新 ID，避免与已有数据冲突
+    vehicleId: r.vehicleId || defaultVehicleId,  // 自动关联到当前车辆
     date: r.date,
     currentMileage: toNumber(r.currentMileage),
     fuelAmount: toNumber(r.fuelAmount),
@@ -135,17 +136,12 @@ async function importJSON(text: string): Promise<number> {
     calculatedCostPerKm: r.calculatedCostPerKm ?? null,
     algorithmUsed: r.algorithmUsed ?? null,
     note: toString(r.note),
-    createdAt: r.createdAt || now,
-    updatedAt: r.updatedAt || now,
+    createdAt: now,
+    updatedAt: now,
   }));
 
-  const existingIds = new Set((await db.refuelRecords.toArray()).map(r => r.id));
-  const newRecords = completeRecords.filter(r => !existingIds.has(r.id));
-
-  if (newRecords.length === 0) return 0;
-
-  await db.refuelRecords.bulkAdd(newRecords);
-  return newRecords.length;
+  await db.refuelRecords.bulkAdd(completeRecords);
+  return completeRecords.length;
 }
 
 // ==================== Excel 导入逻辑 ====================
@@ -203,6 +199,12 @@ function mapRow(row: Record<string, unknown>): Partial<RefuelRecord> {
   return mapped;
 }
 
+async function getDefaultVehicleId(): Promise<string> {
+  const vehicles = await db.vehicles.toArray();
+  const activeVehicle = vehicles.find(v => v.isActive) || vehicles[0];
+  return activeVehicle?.id || '';
+}
+
 async function importExcel(file: File): Promise<number> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
@@ -226,10 +228,11 @@ async function importExcel(file: File): Promise<number> {
     );
   }
 
+  const defaultVehicleId = await getDefaultVehicleId();
   const now = new Date().toISOString();
   const records: RefuelRecord[] = rows.map((r) => ({
     id: generateUUID(),
-    vehicleId: (r.vehicleId as string) || '',
+    vehicleId: (r.vehicleId as string) || defaultVehicleId,
     date: String(r.date || ''),
     currentMileage: toNumber(r.currentMileage),
     fuelAmount: toNumber(r.fuelAmount),
@@ -274,10 +277,11 @@ async function importCSV(file: File): Promise<number> {
     );
   }
 
+  const defaultVehicleId = await getDefaultVehicleId();
   const now = new Date().toISOString();
   const records: RefuelRecord[] = rows.map((r) => ({
     id: generateUUID(),
-    vehicleId: (r.vehicleId as string) || '',
+    vehicleId: (r.vehicleId as string) || defaultVehicleId,
     date: String(r.date || ''),
     currentMileage: toNumber(r.currentMileage),
     fuelAmount: toNumber(r.fuelAmount),
