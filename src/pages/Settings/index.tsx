@@ -178,12 +178,16 @@ async function importJSON(text: string): Promise<number> {
     updatedAt: now,
   }));
 
-  await db.refuelRecords.bulkAdd(completeRecords);
-
-  // 对没有油耗的记录重新计算
-  await recalcMissing(completeRecords[0]?.vehicleId || defaultVehicleId);
-
-  return completeRecords.length;
+  // 后端模式 vs 本地模式
+  const serverOk = await checkServer();
+  if (serverOk) {
+    const { imported } = await refuelsApi.import(completeRecords);
+    return imported;
+  } else {
+    await db.refuelRecords.bulkAdd(completeRecords);
+    await recalcMissing(completeRecords[0]?.vehicleId || defaultVehicleId);
+    return completeRecords.length;
+  }
 }
 
 // ==================== Excel 导入逻辑 ====================
@@ -346,9 +350,15 @@ async function importExcel(file: File): Promise<number> {
     updatedAt: now,
   }));
 
-  await db.refuelRecords.bulkAdd(records);
-  await recalcMissing(records[0]?.vehicleId || defaultVehicleId);
-  return records.length;
+  const serverOk = await checkServer();
+  if (serverOk) {
+    const { imported } = await refuelsApi.import(records);
+    return imported;
+  } else {
+    await db.refuelRecords.bulkAdd(records);
+    await recalcMissing(records[0]?.vehicleId || defaultVehicleId);
+    return records.length;
+  }
 }
 
 // ==================== CSV 导入逻辑 ====================
@@ -396,9 +406,15 @@ async function importCSV(file: File): Promise<number> {
     updatedAt: now,
   }));
 
-  await db.refuelRecords.bulkAdd(records);
-  await recalcMissing(records[0]?.vehicleId || defaultVehicleId);
-  return records.length;
+  const serverOk = await checkServer();
+  if (serverOk) {
+    const { imported } = await refuelsApi.import(records);
+    return imported;
+  } else {
+    await db.refuelRecords.bulkAdd(records);
+    await recalcMissing(records[0]?.vehicleId || defaultVehicleId);
+    return records.length;
+  }
 }
 
 // ==================== 页面组件 ====================
