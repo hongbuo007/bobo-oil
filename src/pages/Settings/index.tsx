@@ -76,6 +76,38 @@ function toString(val: unknown): string {
   return String(val ?? '');
 }
 
+// Excel 日期序列号转 YYYY-MM-DD（例如 45678 → 2025-01-15）
+function excelDateToString(val: unknown): string {
+  if (val === null || val === undefined || val === '') return '';
+  // 已经是字符串格式的日期
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    // 尝试识别各种日期格式
+    // YYYY-MM-DD 或 YYYY/MM/DD
+    const match1 = trimmed.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if (match1) {
+      return `${match1[1]}-${match1[2].padStart(2, '0')}-${match1[3].padStart(2, '0')}`;
+    }
+    // MM/DD/YYYY 或 DD/MM/YYYY
+    const match2 = trimmed.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+    if (match2) {
+      return `${match2[3]}-${match2[1].padStart(2, '0')}-${match2[2].padStart(2, '0')}`;
+    }
+    return trimmed;
+  }
+  // Excel 数字日期序列号
+  if (typeof val === 'number') {
+    // Excel 日期从 1900-01-01 开始计数（但 Excel 有个 bug：把 1900 当作闰年）
+    // 序列号 1 = 1900-01-01，序列号 60 = 1900-02-29（不存在），所以 >= 60 需要 -1
+    const excelEpoch = Date.UTC(1899, 11, 30); // 1899-12-30
+    let days = Math.floor(val);
+    if (days >= 60) days -= 1; // 修正 Excel 1900 闰年 bug
+    const date = new Date(excelEpoch + days * 86400000);
+    return date.toISOString().split('T')[0];
+  }
+  return '';
+}
+
 // ==================== JSON 导入逻辑 ====================
 
 function validateRefuelRecord(data: unknown): data is RefuelRecord[] {
@@ -122,7 +154,7 @@ async function importJSON(text: string): Promise<number> {
   const completeRecords: RefuelRecord[] = records.map((r) => ({
     id: generateUUID(),  // 始终生成新 ID，避免与已有数据冲突
     vehicleId: r.vehicleId || defaultVehicleId,  // 自动关联到当前车辆
-    date: r.date,
+    date: excelDateToString(r.date),
     currentMileage: toNumber(r.currentMileage),
     fuelAmount: toNumber(r.fuelAmount),
     unitPrice: toNumber(r.unitPrice),
@@ -233,7 +265,7 @@ async function importExcel(file: File): Promise<number> {
   const records: RefuelRecord[] = rows.map((r) => ({
     id: generateUUID(),
     vehicleId: (r.vehicleId as string) || defaultVehicleId,
-    date: String(r.date || ''),
+    date: excelDateToString(r.date),
     currentMileage: toNumber(r.currentMileage),
     fuelAmount: toNumber(r.fuelAmount),
     unitPrice: toNumber(r.unitPrice),
@@ -282,7 +314,7 @@ async function importCSV(file: File): Promise<number> {
   const records: RefuelRecord[] = rows.map((r) => ({
     id: generateUUID(),
     vehicleId: (r.vehicleId as string) || defaultVehicleId,
-    date: String(r.date || ''),
+    date: excelDateToString(r.date),
     currentMileage: toNumber(r.currentMileage),
     fuelAmount: toNumber(r.fuelAmount),
     unitPrice: toNumber(r.unitPrice),
