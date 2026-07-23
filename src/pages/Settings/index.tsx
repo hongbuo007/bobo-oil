@@ -510,7 +510,7 @@ export default function SettingsPage() {
 
       <Card title="数据导入">
         <Alert
-          message="导入说明"
+          title="导入说明"
           description={
             <ul className="list-disc pl-4 mt-1 space-y-0.5 text-sm">
               <li><strong>JSON</strong>：支持本应用导出的 JSON 格式，或包含 <code>date</code>、<code>currentMileage</code> 字段��数组</li>

@@ -91,7 +91,7 @@ export default function VehicleForm() {
   if (isEdit && pageLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Spin size="large" tip="加载车辆信息..." />
+        <Spin size="large" description="加载车辆信息..." />
       </div>
     );
   }

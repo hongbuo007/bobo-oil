@@ -19,7 +19,7 @@ const colorMap: Record<string, string> = {
 export default function StatCard({ title, value, unit, prefix, color = 'blue', loading = false }: StatCardProps) {
   const displayValue = value === null || value === undefined ? '--' : value;
   return (
-    <Card className="h-full" bodyStyle={{ padding: '20px' }}>
+    <Card className="h-full" styles={{ body: { padding: '20px' } }}>
       {loading ? (
         <Skeleton active paragraph={{ rows: 1 }} title={{ width: '60%' }} />
       ) : (
