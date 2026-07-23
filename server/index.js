@@ -20,14 +20,16 @@ app.use('/api/refuels', refuelRoutes);
 
 // 静态文件（生产环境前端）
 const distPath = path.join(__dirname, '..', 'dist');
-app.use(express.static(distPath));
+if (require('fs').existsSync(distPath)) {
+  app.use(express.static(distPath));
 
-// SPA fallback
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(distPath, 'index.html'));
-  }
-});
+  // SPA fallback
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(distPath, 'index.html'));
+    }
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`🚗 bobo油耗服务端已启动: http://localhost:${PORT}`);

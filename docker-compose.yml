@@ -1,0 +1,14 @@
+# bobo油耗 - Docker Compose 部署
+
+services:
+  bobo-oil:
+    build: .
+    container_name: bobo-oil
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./data:/app/server/data
+    restart: unless-stopped
+    environment:
+      - JWT_SECRET=bobo-oil-production-secret-change-me
+      - TZ=Asia/Shanghai
