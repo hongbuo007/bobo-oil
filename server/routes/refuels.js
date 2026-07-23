@@ -152,6 +152,20 @@ router.post('/import', (req, res) => {
   const now = new Date().toISOString();
   let imported = 0;
 
+  // 如果没有指定 vehicleId，创建默认车辆
+  let defaultVehicleId = records[0]?.vehicleId || '';
+  if (!defaultVehicleId) {
+    const existingVehicle = db.prepare('SELECT id FROM vehicles WHERE is_active = 1 LIMIT 1').get();
+    if (existingVehicle) {
+      defaultVehicleId = existingVehicle.id;
+    } else {
+      defaultVehicleId = crypto.randomUUID();
+      db.prepare(`INSERT INTO vehicles (id, name, brand, model, vehicle_type, license_plate, engine_capacity, transmission, fuel_type, fuel_tank_capacity, purchase_date, current_mileage, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(defaultVehicleId, '我的车', '', '', 'fuel', '', 0, 'AT', '92#', 50, '', 0, 1, now, now);
+    }
+  }
+
   const insert = db.prepare(`INSERT OR IGNORE INTO refuel_records
     (id, vehicle_id, date, current_mileage, fuel_amount, unit_price, total_cost, fuel_type, station_name,
      is_full_tank, is_low_fuel_light, is_missed_previous, calculated_consumption, calculated_cost_per_km,
@@ -162,7 +176,7 @@ router.post('/import', (req, res) => {
     for (const r of records) {
       const row = toSnake({
         id: r.id || crypto.randomUUID(),
-        vehicleId: r.vehicleId || '',
+        vehicleId: r.vehicleId || defaultVehicleId,
         date: r.date || '',
         currentMileage: r.currentMileage || 0,
         fuelAmount: r.fuelAmount || 0,
@@ -188,17 +202,20 @@ router.post('/import', (req, res) => {
       if (info.changes > 0) imported++;
     }
 
-    // 重算油耗
+    // 重算油耗（对所有有 vehicleId 或全部记录）
     const vehicleIds = [...new Set(records.map(r => r.vehicleId).filter(Boolean))];
+    // 如果没有指定 vehicleId，获取所有不同的 vehicle_id
+    if (vehicleIds.length === 0) {
+      const allVids = db.prepare('SELECT DISTINCT vehicle_id FROM refuel_records WHERE vehicle_id != ?').all('');
+      allVids.forEach(row => { if (row.vehicle_id) vehicleIds.push(row.vehicle_id); });
+    }
     for (const vid of vehicleIds) {
       const all = db.prepare('SELECT * FROM refuel_records WHERE vehicle_id = ? ORDER BY date ASC').all(vid);
       const update = db.prepare(`UPDATE refuel_records SET calculated_consumption=?, calculated_cost_per_km=?, algorithm_used=?, updated_at=? WHERE id=?`);
       for (let i = 0; i < all.length; i++) {
         const hist = all.slice(0, i);
         const r = calculateConsumption(all[i], hist);
-        if (all[i].calculated_consumption !== r.consumption || all[i].calculated_cost_per_km !== r.costPerKm) {
-          update.run(r.consumption, r.costPerKm, r.algorithm, now, all[i].id);
-        }
+        update.run(r.consumption, r.costPerKm, r.algorithm, now, all[i].id);
       }
     }
   });
