@@ -1,18 +1,22 @@
-import { useState, useCallback, useRef } from 'react';
-import { Card, Button, Upload, Popconfirm, Input, message, Space, Divider, Descriptions, Typography } from 'antd';
-import { DownloadOutlined, UploadOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { useState, useCallback } from 'react';
+import { Card, Button, Upload, Popconfirm, Input, message, Space, Descriptions, Typography, Tabs, Alert, Radio } from 'antd';
+import { DownloadOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
+import * as XLSX from 'xlsx';
 import { db } from '@/db';
 import { APP_NAME, APP_VERSION } from '@/config/constants';
 import type { RefuelRecord } from '@/models/refuel';
 import type { Vehicle } from '@/models/vehicle';
+import type { FuelType } from '@/models/vehicle';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
+
+// ==================== 工具函数 ====================
 
 function generateCSV(records: RefuelRecord[]): string {
   const headers = [
     '日期', '里程(km)', '加油量(L)', '单价(元/L)', '总金额(元)',
-    '油品', '加油站', '是否加满', '是否亮灯', '油耗(L/100km)',
+    '油品', '加油站', '是否加满', '是否亮灯', '是否漏记', '油耗(L/100km)',
     '每公里成本', '备注',
   ];
   const rows = records.map((r) => [
@@ -25,6 +29,7 @@ function generateCSV(records: RefuelRecord[]): string {
     r.stationName,
     r.isFullTank ? '是' : '否',
     r.isLowFuelLight ? '是' : '否',
+    r.isMissedPrevious ? '是' : '否',
     r.calculatedConsumption ?? '',
     r.calculatedCostPerKm ?? '',
     r.note,
@@ -48,21 +53,253 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
+function parseBool(val: unknown): boolean {
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  const s = String(val ?? '').trim();
+  return s === '是' || s === 'true' || s === '1' || s === 'TRUE' || s === 'yes' || s === 'YES';
+}
+
+function parseFuelType(val: unknown): FuelType {
+  const s = String(val ?? '').trim();
+  const validTypes: FuelType[] = ['92#', '95#', '98#', '0#柴油'];
+  return validTypes.includes(s as FuelType) ? (s as FuelType) : '92#';
+}
+
+function toNumber(val: unknown): number {
+  const n = Number(val);
+  return isNaN(n) ? 0 : n;
+}
+
+function toString(val: unknown): string {
+  return String(val ?? '');
+}
+
+// ==================== JSON 导入逻辑 ====================
+
 function validateRefuelRecord(data: unknown): data is RefuelRecord[] {
   if (!Array.isArray(data)) return false;
+  if (data.length === 0) return true; // 空数组也算合法
   return data.every(
     (item) =>
       typeof item === 'object' &&
       item !== null &&
-      typeof item.id === 'string' &&
-      typeof item.vehicleId === 'string' &&
       typeof item.date === 'string' &&
-      typeof item.currentMileage === 'number' &&
-      typeof item.fuelAmount === 'number' &&
-      typeof item.unitPrice === 'number' &&
-      typeof item.totalCost === 'number',
+      typeof item.currentMileage === 'number',
   );
 }
+
+async function importJSON(text: string): Promise<number> {
+  const data = JSON.parse(text);
+
+  // 支持两种格式：直接数组 或 { refuelRecords: [...] }
+  let records: RefuelRecord[];
+  if (Array.isArray(data)) {
+    records = data;
+  } else if (data && typeof data === 'object' && Array.isArray(data.refuelRecords)) {
+    records = data.refuelRecords;
+
+    // 也导入车辆数据
+    if (Array.isArray(data.vehicles)) {
+      const existingVehicles = new Set((await db.vehicles.toArray()).map(v => v.id));
+      const newVehicles = data.vehicles.filter((v: Vehicle) => !existingVehicles.has(v.id));
+      if (newVehicles.length > 0) {
+        await db.vehicles.bulkAdd(newVehicles);
+      }
+    }
+  } else {
+    throw new Error('无法识别的数据格式');
+  }
+
+  if (!validateRefuelRecord(records)) {
+    throw new Error('数据格式校验失败：每条记录至少需要 date 和 currentMileage 字段');
+  }
+
+  // 补充缺失的字段，确保每条记录完整
+  const now = new Date().toISOString();
+  const completeRecords: RefuelRecord[] = records.map((r) => ({
+    id: r.id || crypto.randomUUID(),
+    vehicleId: r.vehicleId || '',
+    date: r.date,
+    currentMileage: toNumber(r.currentMileage),
+    fuelAmount: toNumber(r.fuelAmount),
+    unitPrice: toNumber(r.unitPrice),
+    totalCost: toNumber(r.totalCost),
+    fuelType: parseFuelType(r.fuelType),
+    stationName: toString(r.stationName),
+    isFullTank: parseBool(r.isFullTank),
+    isLowFuelLight: parseBool(r.isLowFuelLight),
+    isMissedPrevious: parseBool(r.isMissedPrevious),
+    calculatedConsumption: r.calculatedConsumption ?? null,
+    calculatedCostPerKm: r.calculatedCostPerKm ?? null,
+    algorithmUsed: r.algorithmUsed ?? null,
+    note: toString(r.note),
+    createdAt: r.createdAt || now,
+    updatedAt: r.updatedAt || now,
+  }));
+
+  const existingIds = new Set((await db.refuelRecords.toArray()).map(r => r.id));
+  const newRecords = completeRecords.filter(r => !existingIds.has(r.id));
+
+  if (newRecords.length === 0) return 0;
+
+  await db.refuelRecords.bulkAdd(newRecords);
+  return newRecords.length;
+}
+
+// ==================== Excel 导入逻辑 ====================
+
+/**
+ * 列名映射：Excel/CSV 表头 → 数据库字段
+ */
+const COLUMN_MAP: Record<string, string> = {
+  '日期': 'date',
+  '加油日期': 'date',
+  '里程': 'currentMileage',
+  '里程(km)': 'currentMileage',
+  '当前里程': 'currentMileage',
+  '总里程': 'currentMileage',
+  '加油量': 'fuelAmount',
+  '加油量(L)': 'fuelAmount',
+  '升数': 'fuelAmount',
+  '单价': 'unitPrice',
+  '单价(元/L)': 'unitPrice',
+  '油价': 'unitPrice',
+  '总金额': 'totalCost',
+  '总金额(元)': 'totalCost',
+  '金额': 'totalCost',
+  '油费': 'totalCost',
+  '油品': 'fuelType',
+  '油品类型': 'fuelType',
+  '燃油类型': 'fuelType',
+  '加油站': 'stationName',
+  '加油站名称': 'stationName',
+  '加油站点': 'stationName',
+  '是否加满': 'isFullTank',
+  '是否跳枪': 'isFullTank',
+  '加满': 'isFullTank',
+  '跳枪': 'isFullTank',
+  '是否亮灯': 'isLowFuelLight',
+  '油灯亮': 'isLowFuelLight',
+  '亮灯': 'isLowFuelLight',
+  '是否漏记': 'isMissedPrevious',
+  '漏记上次': 'isMissedPrevious',
+  '油耗': 'calculatedConsumption',
+  '油耗(L/100km)': 'calculatedConsumption',
+  '百公里油耗': 'calculatedConsumption',
+  '每公里成本': 'calculatedCostPerKm',
+  '每公里费用': 'calculatedCostPerKm',
+  '备注': 'note',
+  '说明': 'note',
+};
+
+function mapRow(row: Record<string, unknown>): Partial<RefuelRecord> {
+  const mapped: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    const field = COLUMN_MAP[key.trim()] || key.trim();
+    mapped[field] = value;
+  }
+  return mapped;
+}
+
+async function importExcel(file: File): Promise<number> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) throw new Error('Excel 文件中没有工作表');
+
+  const sheet = workbook.Sheets[sheetName];
+  const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+
+  if (rawData.length === 0) throw new Error('Excel 文件中没有数据');
+
+  // 映射列名
+  const rows = rawData.map(mapRow);
+
+  // 检查必填字段
+  const firstRow = rows[0];
+  if (!firstRow.date && !firstRow.currentMileage) {
+    throw new Error(
+      '未识别到日期或里程列。请确保 Excel 表头包含"日期"和"里程"列。\n' +
+      '当前表头：' + Object.keys(rawData[0]).join(', '),
+    );
+  }
+
+  const now = new Date().toISOString();
+  const records: RefuelRecord[] = rows.map((r) => ({
+    id: crypto.randomUUID(),
+    vehicleId: (r.vehicleId as string) || '',
+    date: String(r.date || ''),
+    currentMileage: toNumber(r.currentMileage),
+    fuelAmount: toNumber(r.fuelAmount),
+    unitPrice: toNumber(r.unitPrice),
+    totalCost: toNumber(r.totalCost),
+    fuelType: parseFuelType(r.fuelType),
+    stationName: toString(r.stationName),
+    isFullTank: parseBool(r.isFullTank),
+    isLowFuelLight: parseBool(r.isLowFuelLight),
+    isMissedPrevious: parseBool(r.isMissedPrevious),
+    calculatedConsumption: r.calculatedConsumption != null ? toNumber(r.calculatedConsumption) : null,
+    calculatedCostPerKm: r.calculatedCostPerKm != null ? toNumber(r.calculatedCostPerKm) : null,
+    algorithmUsed: null,
+    note: toString(r.note),
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  await db.refuelRecords.bulkAdd(records);
+  return records.length;
+}
+
+// ==================== CSV 导入逻辑 ====================
+
+async function importCSV(file: File): Promise<number> {
+  const text = await file.text();
+  const workbook = XLSX.read(text, { type: 'string', raw: true });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) throw new Error('CSV 文件中没有数据');
+
+  const sheet = workbook.Sheets[sheetName];
+  const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+
+  if (rawData.length === 0) throw new Error('CSV 文件中没有数据');
+
+  const rows = rawData.map(mapRow);
+  const firstRow = rows[0];
+
+  if (!firstRow.date && !firstRow.currentMileage) {
+    throw new Error(
+      '未识别到日期或里程列。请确保 CSV 表头包含"日期"和"里程"列。',
+    );
+  }
+
+  const now = new Date().toISOString();
+  const records: RefuelRecord[] = rows.map((r) => ({
+    id: crypto.randomUUID(),
+    vehicleId: (r.vehicleId as string) || '',
+    date: String(r.date || ''),
+    currentMileage: toNumber(r.currentMileage),
+    fuelAmount: toNumber(r.fuelAmount),
+    unitPrice: toNumber(r.unitPrice),
+    totalCost: toNumber(r.totalCost),
+    fuelType: parseFuelType(r.fuelType),
+    stationName: toString(r.stationName),
+    isFullTank: parseBool(r.isFullTank),
+    isLowFuelLight: parseBool(r.isLowFuelLight),
+    isMissedPrevious: parseBool(r.isMissedPrevious),
+    calculatedConsumption: r.calculatedConsumption != null ? toNumber(r.calculatedConsumption) : null,
+    calculatedCostPerKm: r.calculatedCostPerKm != null ? toNumber(r.calculatedCostPerKm) : null,
+    algorithmUsed: null,
+    note: toString(r.note),
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  await db.refuelRecords.bulkAdd(records);
+  return records.length;
+}
+
+// ==================== 页面组件 ====================
 
 export default function SettingsPage() {
   const [importing, setImporting] = useState(false);
@@ -103,42 +340,40 @@ export default function SettingsPage() {
     }
   }, []);
 
+  // 统一导入处理（JSON / Excel / CSV）
   const handleImport: UploadProps['beforeUpload'] = useCallback(
-    (file) => {
+    async (file) => {
       setImporting(true);
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const text = e.target?.result as string;
-          const data = JSON.parse(text);
-          if (!validateRefuelRecord(data)) {
-            message.error('文件格式不正确，请检查文件内容');
-            setImporting(false);
-            return;
-          }
+      try {
+        const name = file.name.toLowerCase();
+        let count = 0;
 
-          const existingIds = new Set(
-            (await db.refuelRecords.toArray()).map((r) => r.id),
-          );
-          const newRecords = data.filter((r) => !existingIds.has(r.id));
-
-          if (newRecords.length === 0) {
-            message.info('没有新的记录需要导入');
-            setImporting(false);
-            return;
-          }
-
-          await db.refuelRecords.bulkAdd(newRecords);
-          message.success(`成功导入 ${newRecords.length} 条记录`);
-        } catch (err) {
-          message.error('导入失败，请检查文件格式');
-          console.error(err);
-        } finally {
+        if (name.endsWith('.json')) {
+          const text = await file.text();
+          count = await importJSON(text);
+        } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+          count = await importExcel(file);
+        } else if (name.endsWith('.csv')) {
+          count = await importCSV(file);
+        } else {
+          message.error('不支持的文件格式，请选择 JSON、Excel (.xlsx/.xls) 或 CSV 文件');
           setImporting(false);
+          return false;
         }
-      };
-      reader.readAsText(file);
-      return false; // 阻止自动上传
+
+        if (count === 0) {
+          message.info('没有新的记录需要导入（可能已存在）');
+        } else {
+          message.success(`成功导入 ${count} 条记录`);
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : '未知错误';
+        message.error(`导入失败：${errMsg}`);
+        console.error(err);
+      } finally {
+        setImporting(false);
+      }
+      return false;
     },
     [],
   );
@@ -150,7 +385,6 @@ export default function SettingsPage() {
       message.success('所有数据已清空');
       setClearPopconfirmOpen(false);
       setClearConfirmText('');
-      // 刷新页面以重置状态
       window.location.reload();
     } catch (err) {
       message.error('清空数据失败');
@@ -159,42 +393,46 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="p-6 max-w-2xl space-y-6">
+    <div className="p-4 md:p-6 max-w-2xl space-y-6">
       <Card title="数据导出">
-        <Space size="middle">
-          <Button
-            type="primary"
-            icon={<DownloadOutlined />}
-            onClick={handleExportCSV}
-          >
+        <Space size="middle" wrap>
+          <Button type="primary" icon={<DownloadOutlined />} onClick={handleExportCSV}>
             导出为 CSV
           </Button>
-          <Button
-            icon={<DownloadOutlined />}
-            onClick={handleExportJSON}
-          >
+          <Button icon={<DownloadOutlined />} onClick={handleExportJSON}>
             导出为 JSON
           </Button>
         </Space>
       </Card>
 
       <Card title="数据导入">
-        <div className="space-y-3">
-          <Text type="secondary">
-            支持导入 JSON 格式的加油记录文件。导入时将合并数据，已存在的记录（相同 ID）将被跳过。
-          </Text>
-          <Upload
-            accept=".json"
-            showUploadList={false}
-            beforeUpload={handleImport}
-          >
-            <Button
-              icon={<UploadOutlined />}
-              loading={importing}
-            >
-              选择 JSON 文件导入
-            </Button>
-          </Upload>
+        <Alert
+          message="导入说明"
+          description={
+            <ul className="list-disc pl-4 mt-1 space-y-0.5 text-sm">
+              <li><strong>JSON</strong>：支持本应用导出的 JSON 格式，或包含 <code>date</code>、<code>currentMileage</code> 字段��数组</li>
+              <li><strong>Excel (.xlsx/.xls)</strong>：第一行为表头，需包含"日期"和"里程"列</li>
+              <li><strong>CSV</strong>：同 Excel 格式，需包含"日期"和"里程"列</li>
+              <li>导入时自动跳过已存在的记录（按 ID 判断），新记录自动分配 ID</li>
+            </ul>
+          }
+          type="info"
+          showIcon
+          className="mb-4"
+        />
+        <Upload
+          accept=".json,.xlsx,.xls,.csv"
+          showUploadList={false}
+          beforeUpload={handleImport}
+        >
+          <Button icon={<UploadOutlined />} loading={importing} size="large">
+            选择文件导入（JSON / Excel / CSV）
+          </Button>
+        </Upload>
+
+        <div className="mt-4 p-3 bg-gray-50 rounded text-xs text-gray-500">
+          <p className="font-medium mb-1">Excel/CSV 表头参考（支持以下列名）：</p>
+          <p>日期、里程(km)、加油量(L)、单价(元/L)、总金额(元)、油品、加油站、是否加满、是否亮灯、是否漏记、备注</p>
         </div>
       </Card>
 
@@ -228,11 +466,7 @@ export default function SettingsPage() {
             okText="确认清空"
             cancelText="取消"
           >
-            <Button
-              danger
-              type="primary"
-              icon={<DeleteOutlined />}
-            >
+            <Button danger type="primary" icon={<DeleteOutlined />}>
               清空所有数据
             </Button>
           </Popconfirm>
