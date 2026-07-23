@@ -173,7 +173,7 @@ export default function StatisticsPage() {
           {/* 汇总指标卡 */}
           <Row gutter={[16, 16]}>
             <Col xs={12} sm={8} md={4}>
-              <StatCard title="累计油费" value={summary.totalCost} prefix="¥" color="orange" />
+              <StatCard title="累计油费" value={summary.totalCost.toFixed(2)} prefix="¥" color="orange" />
             </Col>
             <Col xs={12} sm={8} md={4}>
               <StatCard title="累计加油" value={summary.totalFuel.toFixed(0)} unit="L" color="blue" />
