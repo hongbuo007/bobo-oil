@@ -447,10 +447,13 @@ export default function SettingsPage() {
     try {
       await db.refuelRecords.clear();
       await db.vehicles.clear();
-      message.success('所有数据已清空');
+      await db.settings.clear();
+      // 删除整个数据库确保彻底清除
+      await db.delete();
+      message.success('所有数据已清空，即将刷新页面');
       setClearPopconfirmOpen(false);
       setClearConfirmText('');
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 500);
     } catch (err) {
       message.error('清空数据失败');
       console.error(err);
