@@ -48,6 +48,18 @@ export function calculateConsumption(
   return result;
 }
 
+// 获取实付金额（兼容旧数据）
+function getActualCost(r: RefuelRecord | RefuelFormData): number {
+  if ('actualCost' in r && r.actualCost !== undefined && r.actualCost !== null) {
+    return r.actualCost;
+  }
+  // 兼容旧数据：actualCost = totalCost - discount
+  if ('discount' in r && r.discount !== undefined && r.discount !== null) {
+    return r.totalCost - (r as any).discount;
+  }
+  return r.totalCost;
+}
+
 function findBestAlgorithm(
   current: RefuelFormData | RefuelRecord,
   history: RefuelRecord[]
@@ -65,7 +77,7 @@ function findBestAlgorithm(
         const mileageDiff = current.currentMileage - lastFullTank.currentMileage;
         if (mileageDiff > 0) {
           const consumption = (current.fuelAmount / mileageDiff) * 100;
-          const costPerKm = current.totalCost / mileageDiff;
+          const costPerKm = getActualCost(current) / mileageDiff;
           candidates.push({
             result: { consumption: round(consumption), costPerKm: round(costPerKm), algorithm: 1 },
             span: 1,
@@ -82,7 +94,7 @@ function findBestAlgorithm(
             .reduce((sum, r) => sum + r.fuelAmount, 0) + current.fuelAmount;
           const intervalCost = history
             .slice(lastFullTankIdx + 1)
-            .reduce((sum, r) => sum + r.totalCost, 0) + current.totalCost;
+            .reduce((sum, r) => sum + getActualCost(r), 0) + getActualCost(current);
           const consumption = (intervalFuel / mileageDiff) * 100;
           const costPerKm = intervalCost / mileageDiff;
           candidates.push({
@@ -110,7 +122,7 @@ function findBestAlgorithm(
           // 每公里成本 = (上次金额 + 中间金额) / 里程差
           const intervalCost = history
             .slice(lastLightIdx)
-            .reduce((sum, r) => sum + r.totalCost, 0);
+            .reduce((sum, r) => sum + getActualCost(r), 0);
           const costPerKm = intervalCost / mileageDiff;
           candidates.push({
             result: { consumption: round(consumption), costPerKm: round(costPerKm), algorithm: 2 },
@@ -128,7 +140,7 @@ function findBestAlgorithm(
             .reduce((sum, r) => sum + r.fuelAmount, 0);
           const intervalCost = history
             .slice(lastLightIdx)
-            .reduce((sum, r) => sum + r.totalCost, 0);
+            .reduce((sum, r) => sum + getActualCost(r), 0);
           const consumption = (intervalFuel / mileageDiff) * 100;
           const costPerKm = intervalCost / mileageDiff;
           candidates.push({

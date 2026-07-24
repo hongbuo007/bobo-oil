@@ -44,7 +44,7 @@ export default function RefuelPage() {
 
   const summary = useMemo(() => {
     const totalAmount = records.reduce((sum, r) => sum + r.fuelAmount, 0);
-    const totalCost = records.reduce((sum, r) => sum + r.totalCost, 0);
+    const totalCost = records.reduce((sum, r) => sum + (r.actualCost ?? r.totalCost ?? 0), 0);
     return { totalAmount, totalCost };
   }, [records]);
 
@@ -81,11 +81,13 @@ export default function RefuelPage() {
     },
     {
       title: '金额',
-      dataIndex: 'totalCost',
       key: 'totalCost',
       width: 100,
-      render: (val: number) => formatMoney(val),
-      sorter: (a, b) => a.totalCost - b.totalCost,
+      render: (_: unknown, r: RefuelRecord) => {
+        const actual = r.actualCost ?? r.totalCost ?? 0;
+        return <span>{formatMoney(actual)}{r.discount > 0 ? <span className="text-xs text-green-500 ml-1">省{r.discount.toFixed(0)}</span> : null}</span>;
+      },
+      sorter: (a: RefuelRecord, b: RefuelRecord) => (a.actualCost ?? a.totalCost ?? 0) - (b.actualCost ?? b.totalCost ?? 0),
     },
     {
       title: '油耗',

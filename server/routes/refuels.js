@@ -104,6 +104,8 @@ router.post('/', (req, res) => {
     fuelAmount: req.body.fuelAmount || 0,
     unitPrice: req.body.unitPrice || 0,
     totalCost: req.body.totalCost || 0,
+    discount: req.body.discount || 0,
+    actualCost: req.body.actualCost || (req.body.totalCost || 0) - (req.body.discount || 0),
     fuelType: req.body.fuelType || '92#',
     stationName: req.body.stationName || '',
     isFullTank: req.body.isFullTank ? 1 : 0,
@@ -167,13 +169,15 @@ router.post('/import', (req, res) => {
   }
 
   const insert = db.prepare(`INSERT OR IGNORE INTO refuel_records
-    (id, vehicle_id, date, current_mileage, fuel_amount, unit_price, total_cost, fuel_type, station_name,
+    (id, vehicle_id, date, current_mileage, fuel_amount, unit_price, total_cost, discount, actual_cost, fuel_type, station_name,
      is_full_tank, is_low_fuel_light, is_missed_previous, calculated_consumption, calculated_cost_per_km,
      algorithm_used, note, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
   const transaction = db.transaction(() => {
     for (const r of records) {
+      const discount = r.discount || 0;
+      const actualCost = r.actualCost || ((r.totalCost || 0) - discount);
       const row = toSnake({
         id: r.id || crypto.randomUUID(),
         vehicleId: r.vehicleId || defaultVehicleId,
@@ -182,6 +186,8 @@ router.post('/import', (req, res) => {
         fuelAmount: r.fuelAmount || 0,
         unitPrice: r.unitPrice || 0,
         totalCost: r.totalCost || 0,
+        discount,
+        actualCost,
         fuelType: r.fuelType || '92#',
         stationName: r.stationName || '',
         isFullTank: r.isFullTank ? 1 : 0,
@@ -194,7 +200,7 @@ router.post('/import', (req, res) => {
         createdAt: now,
         updatedAt: now,
       });
-      const keys = ['id', 'vehicle_id', 'date', 'current_mileage', 'fuel_amount', 'unit_price', 'total_cost', 'fuel_type', 'station_name',
+      const keys = ['id', 'vehicle_id', 'date', 'current_mileage', 'fuel_amount', 'unit_price', 'total_cost', 'discount', 'actual_cost', 'fuel_type', 'station_name',
         'is_full_tank', 'is_low_fuel_light', 'is_missed_previous', 'calculated_consumption', 'calculated_cost_per_km',
         'algorithm_used', 'note', 'created_at', 'updated_at'];
       const values = keys.map(k => row[k] !== undefined ? row[k] : null);

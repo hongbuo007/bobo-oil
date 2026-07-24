@@ -61,11 +61,11 @@ app.listen(PORT, () => {
               if (diff > 0) {
                 if (j === hist.length - 1) {
                   bestConsumption = +(curr.fuel_amount / diff * 100).toFixed(2);
-                  bestCostPerKm = +(curr.total_cost / diff).toFixed(4);
+                  bestCostPerKm = +(curr.actual_cost / diff).toFixed(4);
                   bestAlgo = 1;
                 } else {
                   const intervalFuel = hist.slice(j + 1).reduce((s, r) => s + r.fuel_amount, 0) + curr.fuel_amount;
-                  const intervalCost = hist.slice(j + 1).reduce((s, r) => s + r.total_cost, 0) + curr.total_cost;
+                  const intervalCost = hist.slice(j + 1).reduce((s, r) => s + r.actual_cost, 0) + curr.actual_cost;
                   bestConsumption = +(intervalFuel / diff * 100).toFixed(2);
                   bestCostPerKm = +(intervalCost / diff).toFixed(4);
                   bestAlgo = 3;
@@ -82,13 +82,13 @@ app.listen(PORT, () => {
               const diff = curr.current_mileage - hist[j].current_mileage;
               if (diff > 0) {
                 if (j === hist.length - 1) {
-                  const intervalCost = hist.slice(j).reduce((s, r) => s + r.total_cost, 0);
+                  const intervalCost = hist.slice(j).reduce((s, r) => s + r.actual_cost, 0);
                   bestConsumption = +(hist[j].fuel_amount / diff * 100).toFixed(2);
                   bestCostPerKm = +(intervalCost / diff).toFixed(4);
                   bestAlgo = 2;
                 } else {
                   const intervalFuel = hist.slice(j).reduce((s, r) => s + r.fuel_amount, 0);
-                  const intervalCost = hist.slice(j).reduce((s, r) => s + r.total_cost, 0);
+                  const intervalCost = hist.slice(j).reduce((s, r) => s + r.actual_cost, 0);
                   bestConsumption = +(intervalFuel / diff * 100).toFixed(2);
                   bestCostPerKm = +(intervalCost / diff).toFixed(4);
                   bestAlgo = 4;

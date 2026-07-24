@@ -93,19 +93,23 @@ export default function AddRefuel() {
     [form]
   );
 
-  const handleSubmit = async (values: RefuelFormData) => {
+  const handleSubmit = async (values: any) => {
     if (!currentVehicleId) {
       message.error('请先选择车辆');
       return;
     }
     setSubmitting(true);
     try {
+      const discount = values.discount || 0;
+      const actualCost = (values.totalCost || 0) - discount;
       await addRecord({
         ...values,
         vehicleId: currentVehicleId,
         stationName: values.stationName || '',
         note: values.note || '',
-      });
+        discount,
+        actualCost: actualCost > 0 ? actualCost : 0,
+      } as any);
       message.success('加油记录添加成功');
       navigate('/refuel');
     } catch {
@@ -218,8 +222,8 @@ export default function AddRefuel() {
 
             <Form.Item
               name="totalCost"
-              label="总金额(元)"
-              rules={[{ required: true, message: '请输入总金额' }]}
+              label="机显金额(元)"
+              rules={[{ required: true, message: '请输入金额' }]}
             >
               <InputNumber
                 min={0}
@@ -234,6 +238,29 @@ export default function AddRefuel() {
                     setTotalCostManual(true);
                   }
                 }}
+              />
+            </Form.Item>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0 mt-2">
+            <Form.Item
+              name="discount"
+              label="优惠金额(元)"
+              initialValue={0}
+            >
+              <InputNumber
+                min={0}
+                step={0.01}
+                className="w-full"
+                placeholder="0.00"
+              />
+            </Form.Item>
+            <Form.Item label="实付金额(元)" className="mb-0">
+              <InputNumber
+                value={form.getFieldValue('totalCost') !== undefined
+                  ? (form.getFieldValue('totalCost') || 0) - (form.getFieldValue('discount') || 0)
+                  : 0}
+                disabled
+                className="w-full text-green-600 font-bold"
               />
             </Form.Item>
           </div>

@@ -48,6 +48,8 @@ db.exec(`
     fuel_amount REAL NOT NULL DEFAULT 0,
     unit_price REAL NOT NULL DEFAULT 0,
     total_cost REAL NOT NULL DEFAULT 0,
+    discount REAL NOT NULL DEFAULT 0,
+    actual_cost REAL NOT NULL DEFAULT 0,
     fuel_type TEXT NOT NULL DEFAULT '92#',
     station_name TEXT NOT NULL DEFAULT '',
     is_full_tank INTEGER NOT NULL DEFAULT 0,
@@ -63,6 +65,16 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_refuel_vehicle ON refuel_records(vehicle_id, date);
 `);
+
+// 迁移：给旧表添加 discount 和 actual_cost 列
+try {
+  db.exec(`ALTER TABLE refuel_records ADD COLUMN discount REAL NOT NULL DEFAULT 0`);
+} catch {}
+try {
+  db.exec(`ALTER TABLE refuel_records ADD COLUMN actual_cost REAL NOT NULL DEFAULT 0`);
+} catch {}
+// 初始化旧数据的 actual_cost = total_cost
+db.exec(`UPDATE refuel_records SET actual_cost = total_cost WHERE actual_cost = 0 AND total_cost > 0`);
 
 // snake_case DB row → camelCase JS object
 function toCamel(row) {

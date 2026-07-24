@@ -71,6 +71,8 @@ export async function seedDemoData() {
       fuelAmount: item.amt,
       unitPrice: item.price,
       totalCost: Math.round(item.amt * item.price * 100) / 100,
+      discount: 0,
+      actualCost: Math.round(item.amt * item.price * 100) / 100,
       fuelType: '92#',
       stationName: ['中石化北苑加油站', '中石油望京加油站', '壳牌四惠加油站'][Math.floor(Math.random() * 3)],
       isFullTank: item.full,
