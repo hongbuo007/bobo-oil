@@ -84,10 +84,14 @@ export function calculateMonthlyStats(records: RefuelRecord[]): MonthlyStats[] {
       ? sorted[sorted.length - 1].currentMileage - sorted[0].currentMileage
       : 0;
 
-    // 平均行程 = 累计里程 / 加油次数（有里程变化才有效）
-    const avgTripDistance = sorted.length > 1
-      ? Math.round((totalMileage / (sorted.length - 1)) * 100) / 100
-      : 0;
+    // 平均行程 = 累计里程 / 天数（该月首末记录的天数差）
+    let avgTripDistance = 0;
+    if (sorted.length > 1) {
+      const firstDate = new Date(sorted[0].date);
+      const lastDate = new Date(sorted[sorted.length - 1].date);
+      const days = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)));
+      avgTripDistance = Math.round((totalMileage / days) * 100) / 100;
+    }
 
     const validRecords = sorted.filter(r => r.calculatedConsumption !== null);
     const avgConsumption = validRecords.length > 0
