@@ -42,9 +42,16 @@ export default function StatisticsPage() {
   // 汇总统计
   const summary = useMemo(() => {
     const validRecords = records.filter(r => r.calculatedConsumption !== null);
+    const totalMileage = records.length > 1
+      ? records[records.length - 1].currentMileage - records[0].currentMileage
+      : 0;
+    const avgTripDistance = records.length > 1
+      ? Math.round((totalMileage / (records.length - 1)) * 100) / 100
+      : 0;
     return {
-      totalCost: records.reduce((s, r) => s + r.totalCost, 0),
+      totalCost: records.reduce((s, r) => s + (r.actualCost ?? r.totalCost), 0),
       totalFuel: records.reduce((s, r) => s + r.fuelAmount, 0),
+      totalDiscount: records.reduce((s, r) => s + (r.discount || 0), 0),
       avgConsumption: validRecords.length > 0
         ? validRecords.reduce((s, r) => s + r.calculatedConsumption!, 0) / validRecords.length
         : null,
@@ -53,9 +60,8 @@ export default function StatisticsPage() {
             .reduce((s, r) => s + r.calculatedCostPerKm!, 0) /
           validRecords.filter(r => r.calculatedCostPerKm !== null).length
         : null,
-      totalMileage: records.length > 1
-        ? records[records.length - 1].currentMileage - records[0].currentMileage
-        : 0,
+      totalMileage,
+      avgTripDistance,
     };
   }, [records]);
 
@@ -79,7 +85,9 @@ export default function StatisticsPage() {
       totalMileage: s.totalMileage,
       totalFuel: s.totalFuel,
       totalCost: s.totalCost,
+      totalDiscount: s.totalDiscount,
       avgConsumption: s.avgConsumption,
+      avgTripDistance: s.avgTripDistance,
       costPerKm: s.costPerKm,
       recordCount: s.recordCount,
     }));
@@ -123,7 +131,9 @@ export default function StatisticsPage() {
     { title: '行驶里程(km)', dataIndex: 'totalMileage', key: 'mileage', width: 120, render: (v: number) => v.toLocaleString() },
     { title: '加油量(L)', dataIndex: 'totalFuel', key: 'fuel', width: 100, render: (v: number) => v.toFixed(1) },
     { title: '油费(元)', dataIndex: 'totalCost', key: 'cost', width: 100, render: (v: number) => formatMoney(v) },
+    { title: '优惠(元)', dataIndex: 'totalDiscount', key: 'discount', width: 90, render: (v: number) => v > 0 ? formatMoney(v) : '--' },
     { title: '平均油耗', dataIndex: 'avgConsumption', key: 'avg', width: 110, render: (v: number) => v > 0 ? `${v.toFixed(2)} L/100km` : '--' },
+    { title: '平均行程', dataIndex: 'avgTripDistance', key: 'trip', width: 100, render: (v: number) => v > 0 ? `${v.toFixed(0)} km` : '--' },
     { title: '每公里成本', dataIndex: 'costPerKm', key: 'cpk', width: 110, render: (v: number) => v > 0 ? `¥${v.toFixed(2)}/km` : '--' },
     { title: '次数', dataIndex: 'recordCount', key: 'count', width: 60 },
   ];
@@ -172,22 +182,28 @@ export default function StatisticsPage() {
         <>
           {/* 汇总指标卡 */}
           <Row gutter={[16, 16]}>
-            <Col xs={12} sm={8} md={4}>
+            <Col xs={12} sm={8} md={6} lg={3}>
               <StatCard title="累计油费" value={summary.totalCost.toFixed(2)} prefix="¥" color="orange" />
             </Col>
-            <Col xs={12} sm={8} md={4}>
+            <Col xs={12} sm={8} md={6} lg={3}>
               <StatCard title="累计加油" value={summary.totalFuel.toFixed(0)} unit="L" color="blue" />
             </Col>
-            <Col xs={12} sm={8} md={4}>
+            <Col xs={12} sm={8} md={6} lg={3}>
+              <StatCard title="累计优惠" value={summary.totalDiscount.toFixed(2)} prefix="¥" color="green" />
+            </Col>
+            <Col xs={12} sm={8} md={6} lg={3}>
               <StatCard title="平均油耗" value={summary.avgConsumption?.toFixed(2) ?? '--'} unit="L/100km" color="green" />
             </Col>
-            <Col xs={12} sm={8} md={4}>
+            <Col xs={12} sm={8} md={6} lg={3}>
               <StatCard title="每公里成本" value={summary.avgCostPerKm?.toFixed(2) ?? '--'} unit="元/km" color="red" />
             </Col>
-            <Col xs={12} sm={8} md={4}>
+            <Col xs={12} sm={8} md={6} lg={3}>
               <StatCard title="累计里程" value={summary.totalMileage.toLocaleString()} unit="km" color="blue" />
             </Col>
-            <Col xs={12} sm={8} md={4}>
+            <Col xs={12} sm={8} md={6} lg={3}>
+              <StatCard title="平均行程" value={summary.avgTripDistance > 0 ? summary.avgTripDistance.toFixed(0) : '--'} unit="km" color="blue" />
+            </Col>
+            <Col xs={12} sm={8} md={6} lg={3}>
               <StatCard title="记录次数" value={records.length} unit="次" color="green" />
             </Col>
           </Row>
@@ -300,16 +316,18 @@ export default function StatisticsPage() {
               columns={columns}
               pagination={false}
               size="small"
-              scroll={{ x: 750 }}
+              scroll={{ x: 950 }}
               summary={() => (
                 <Table.Summary.Row>
                   <Table.Summary.Cell index={0}><strong>合计</strong></Table.Summary.Cell>
                   <Table.Summary.Cell index={1}>{summary.totalMileage.toLocaleString()}</Table.Summary.Cell>
                   <Table.Summary.Cell index={2}>{summary.totalFuel.toFixed(1)}</Table.Summary.Cell>
                   <Table.Summary.Cell index={3}>{formatMoney(summary.totalCost)}</Table.Summary.Cell>
-                  <Table.Summary.Cell index={4}>{summary.avgConsumption?.toFixed(2) ?? '--'}</Table.Summary.Cell>
-                  <Table.Summary.Cell index={5}>{summary.avgCostPerKm?.toFixed(2) ?? '--'}</Table.Summary.Cell>
-                  <Table.Summary.Cell index={6}>{records.length}</Table.Summary.Cell>
+                  <Table.Summary.Cell index={4}>{summary.totalDiscount > 0 ? formatMoney(summary.totalDiscount) : '--'}</Table.Summary.Cell>
+                  <Table.Summary.Cell index={5}>{summary.avgConsumption?.toFixed(2) ?? '--'}</Table.Summary.Cell>
+                  <Table.Summary.Cell index={6}>{summary.avgTripDistance > 0 ? `${summary.avgTripDistance.toFixed(0)} km` : '--'}</Table.Summary.Cell>
+                  <Table.Summary.Cell index={7}>{summary.avgCostPerKm?.toFixed(2) ?? '--'}</Table.Summary.Cell>
+                  <Table.Summary.Cell index={8}>{records.length}</Table.Summary.Cell>
                 </Table.Summary.Row>
               )}
             />

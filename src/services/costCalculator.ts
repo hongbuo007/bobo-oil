@@ -10,7 +10,9 @@ export interface MonthlyStats {
   totalMileage: number;
   totalFuel: number;
   totalCost: number;
+  totalDiscount: number;
   avgConsumption: number;
+  avgTripDistance: number;
   costPerKm: number;
   recordCount: number;
 }
@@ -77,8 +79,14 @@ export function calculateMonthlyStats(records: RefuelRecord[]): MonthlyStats[] {
     const sorted = monthRecords.sort((a, b) => a.date.localeCompare(b.date));
     const totalFuel = sorted.reduce((sum, r) => sum + r.fuelAmount, 0);
     const totalCost = sorted.reduce((sum, r) => sum + getActualCost(r), 0);
+    const totalDiscount = sorted.reduce((sum, r) => sum + (r.discount || 0), 0);
     const totalMileage = sorted.length > 1
       ? sorted[sorted.length - 1].currentMileage - sorted[0].currentMileage
+      : 0;
+
+    // 平均行程 = 累计里程 / 加油次数（有里程变化才有效）
+    const avgTripDistance = sorted.length > 1
+      ? Math.round((totalMileage / (sorted.length - 1)) * 100) / 100
       : 0;
 
     const validRecords = sorted.filter(r => r.calculatedConsumption !== null);
@@ -91,7 +99,9 @@ export function calculateMonthlyStats(records: RefuelRecord[]): MonthlyStats[] {
       totalMileage,
       totalFuel: Math.round(totalFuel * 100) / 100,
       totalCost: Math.round(totalCost * 100) / 100,
+      totalDiscount: Math.round(totalDiscount * 100) / 100,
       avgConsumption: Math.round(avgConsumption * 100) / 100,
+      avgTripDistance,
       costPerKm: totalMileage > 0 ? Math.round((totalCost / totalMileage) * 10000) / 10000 : 0,
       recordCount: sorted.length,
     });
