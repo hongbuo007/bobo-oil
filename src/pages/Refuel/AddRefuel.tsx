@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -7,11 +7,11 @@ import {
   Select,
   InputNumber,
   DatePicker,
-  Switch,
+  Radio,
   Button,
   message,
 } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CameraOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useVehicleStore } from '@/stores/useVehicleStore';
 import { useRefuelStore } from '@/stores/useRefuelStore';
@@ -27,7 +27,7 @@ export default function AddRefuel() {
 
   const [form] = Form.useForm<RefuelFormData>();
   const [submitting, setSubmitting] = useState(false);
-  const [totalCostManual, setTotalCostManual] = useState(false);
+  const [formValues, setFormValues] = useState<any>({});
 
   useEffect(() => {
     loadVehicles();
@@ -45,65 +45,42 @@ export default function AddRefuel() {
   useEffect(() => {
     if (!currentVehicleId) return;
     form.setFieldsValue({
-      date: dayjs().format('YYYY-MM-DD'),
+      date: dayjs().format('YYYY-MM-DD HH:mm'),
       fuelType: currentVehicle?.fuelType || '92#',
-      isFullTank: false,
+      isFullTank: true,
       isLowFuelLight: false,
       isMissedPrevious: false,
     });
+    setFormValues(form.getFieldsValue());
   }, [currentVehicleId, currentVehicle, form]);
 
-  const handleTotalCostChange = useCallback(
-    (value: number | null) => {
-      if (value == null) return;
-      setTotalCostManual(true);
-      const fuelAmount = form.getFieldValue('fuelAmount');
-      const unitPrice = form.getFieldValue('unitPrice');
+  const onValuesChange = (_: any, all: any) => {
+    setFormValues(all);
+  };
 
-      if (fuelAmount != null && fuelAmount > 0) {
-        const newUnitPrice = Math.round((value / fuelAmount) * 1000) / 1000;
-        form.setFieldsValue({ unitPrice: newUnitPrice });
-      } else if (unitPrice != null && unitPrice > 0) {
-        const newFuelAmount = Math.round((value / unitPrice) * 100) / 100;
-        form.setFieldsValue({ fuelAmount: newFuelAmount });
-      }
-    },
-    [form]
-  );
+  // 机显金额 = 机显单价 × 加油量
+  const displayTotalCost = useMemo(() => {
+    const unitPrice = formValues.unitPrice || 0;
+    const fuelAmount = formValues.fuelAmount || 0;
+    if (unitPrice > 0 && fuelAmount > 0) {
+      return Math.round(unitPrice * fuelAmount * 100) / 100;
+    }
+    return 0;
+  }, [formValues.unitPrice, formValues.fuelAmount]);
 
-  const handleFuelAmountChangeTriple = useCallback(
-    (value: number | null) => {
-      if (value == null) return;
-      const unitPrice = form.getFieldValue('unitPrice');
-      if (unitPrice != null && unitPrice > 0) {
-        form.setFieldsValue({ totalCost: Math.round(value * unitPrice * 100) / 100 });
-      }
-    },
-    [form]
-  );
+  // 实付金额 = 机显金额 - 优惠金额
+  const actualCost = useMemo(() => {
+    return Math.max(0, (displayTotalCost || 0) - (formValues.discount || 0));
+  }, [displayTotalCost, formValues.discount]);
 
-  const handleUnitPriceChangeTriple = useCallback(
-    (value: number | null) => {
-      if (value == null) return;
-      const fuelAmount = form.getFieldValue('fuelAmount');
-      if (fuelAmount != null && fuelAmount > 0) {
-        form.setFieldsValue({ totalCost: Math.round(fuelAmount * value * 100) / 100 });
-      }
-    },
-    [form]
-  );
-
-  // 计算实付单价：实付金额 / 加油量
-  const calcActualUnitPrice = () => {
-    const discount = form.getFieldValue('discount') || 0;
-    const fuelAmount = form.getFieldValue('fuelAmount');
-    const totalCost = form.getFieldValue('totalCost') || 0;
-    const actualCost = totalCost - discount;
-    if (fuelAmount && fuelAmount > 0 && actualCost > 0) {
+  // 实付单价 = 实付金额 / 加油量
+  const actualUnitPrice = useMemo(() => {
+    const fuelAmount = formValues.fuelAmount || 0;
+    if (actualCost > 0 && fuelAmount > 0) {
       return Math.round((actualCost / fuelAmount) * 1000) / 1000;
     }
-    return undefined;
-  };
+    return 0;
+  }, [actualCost, formValues.fuelAmount]);
 
   const handleSubmit = async (values: any) => {
     if (!currentVehicleId) {
@@ -113,14 +90,16 @@ export default function AddRefuel() {
     setSubmitting(true);
     try {
       const discount = values.discount || 0;
-      const actualCost = (values.totalCost || 0) - discount;
+      const totalCost = displayTotalCost;
+      const actualCostValue = totalCost - discount;
       await addRecord({
         ...values,
         vehicleId: currentVehicleId,
         stationName: values.stationName || '',
         note: values.note || '',
+        totalCost,
         discount,
-        actualCost: actualCost > 0 ? actualCost : 0,
+        actualCost: actualCostValue > 0 ? actualCostValue : 0,
       } as any);
       message.success('加油记录添加成功');
       navigate('/refuel');
@@ -141,200 +120,206 @@ export default function AddRefuel() {
   }
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          type="text"
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/refuel')}
-        />
-        <h1 className="text-lg font-bold text-gray-800 m-0">添加加油记录</h1>
+    <div className="p-4 max-w-2xl mx-auto bg-gray-50 min-h-screen">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate('/refuel')}
+          />
+          <h1 className="text-lg font-bold text-gray-800 m-0">{currentVehicle?.name || '添加记录'}</h1>
+          <QuestionCircleOutlined className="text-gray-400" />
+        </div>
+        <Button type="primary" onClick={() => form.submit()} loading={submitting}>
+          保存
+        </Button>
       </div>
 
       <Form
         form={form}
         layout="vertical"
         onFinish={handleSubmit}
+        onValuesChange={onValuesChange}
         scrollToFirstError
       >
-        <Card title="基本信息" className="mb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
-            <Form.Item
-              name="date"
-              label="加油日期"
-              rules={[{ required: true, message: '请选择加���日期' }]}
-              getValueFromEvent={(date: dayjs.Dayjs | null) =>
-                date ? date.format('YYYY-MM-DD') : ''
-              }
-              getValueProps={(value: string) => ({
-                value: value ? dayjs(value) : null,
-              })}
-            >
-              <DatePicker className="w-full" />
-            </Form.Item>
+        <Card className="mb-3 shadow-sm">
+          <Form.Item
+            name="date"
+            label="加油时间"
+            rules={[{ required: true, message: '请选择加油时间' }]}
+            getValueFromEvent={(date: dayjs.Dayjs | null) =>
+              date ? date.format('YYYY-MM-DD HH:mm') : ''
+            }
+            getValueProps={(value: string) => ({
+              value: value ? dayjs(value) : null,
+            })}
+          >
+            <DatePicker showTime className="w-full" format="YYYY-MM-DD HH:mm" />
+          </Form.Item>
 
-            <Form.Item
-              name="currentMileage"
-              label="当前里程(km)"
-              rules={[{ required: true, message: '请输入当前里程' }]}
-            >
-              <InputNumber
-                min={0}
-                className="w-full"
-                placeholder={lastRecord ? `上次里程：${lastRecord.currentMileage} km` : '请输入当前里程'}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="stationName"
-              label="加油站名称"
-            >
-              <Input placeholder="例如：中石化北苑加油站" maxLength={50} />
-            </Form.Item>
-
-            <Form.Item
-              name="fuelType"
-              label="油品类型"
-              rules={[{ required: true, message: '请选择油品类型' }]}
-            >
-              <Select options={fuelTypeOptions} placeholder="请选择油品类型" />
-            </Form.Item>
-          </div>
-        </Card>
-
-        <Card title="加油数据" className="mb-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-0">
-            <Form.Item
-              name="fuelAmount"
-              label="加油量(L)"
-              rules={[{ required: true, message: '请输入加油量' }]}
-            >
-              <InputNumber
-                min={0}
-                step={0.01}
-                className="w-full"
-                placeholder="0.00"
-                onChange={handleFuelAmountChangeTriple}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="unitPrice"
-              label="机显单价(元/L)"
-              rules={[{ required: true, message: '请输入单价' }]}
-            >
-              <InputNumber
-                min={0}
-                step={0.01}
-                className="w-full"
-                placeholder={lastRecord ? `上次：${lastRecord.unitPrice.toFixed(2)}` : '0.00'}
-                onChange={handleUnitPriceChangeTriple}
-              />
-            </Form.Item>
-
-            <Form.Item label="实付单价(元/L)">
-              <InputNumber
-                value={calcActualUnitPrice()}
-                disabled
-                className="w-full text-green-600 font-bold"
-                placeholder="自动计算"
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="totalCost"
-              label="机显金额(元)"
-              rules={[{ required: true, message: '请输入金额' }]}
-            >
-              <InputNumber
-                min={0}
-                step={0.01}
-                className="w-full"
-                placeholder="自动计算或手动输入"
-                onChange={handleTotalCostChange}
-                onFocus={() => {
-                  const fa = form.getFieldValue('fuelAmount');
-                  const up = form.getFieldValue('unitPrice');
-                  if (fa == null && up == null) {
-                    setTotalCostManual(true);
-                  }
-                }}
-              />
-            </Form.Item>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0 mt-2">
-            <Form.Item
-              name="discount"
-              label="优惠金额(元)"
-              initialValue={0}
-            >
-              <InputNumber
-                min={0}
-                step={0.01}
-                className="w-full"
-                placeholder="0.00"
-              />
-            </Form.Item>
-            <Form.Item label="实付金额(元)" className="mb-0">
-              <InputNumber
-                value={form.getFieldValue('totalCost') !== undefined
-                  ? (form.getFieldValue('totalCost') || 0) - (form.getFieldValue('discount') || 0)
-                  : 0}
-                disabled
-                className="w-full text-green-600 font-bold"
-              />
-            </Form.Item>
-          </div>
-        </Card>
-
-        <Card title="状态标记" className="mb-4">
-          <div className="flex flex-col gap-4">
-            <Form.Item
-              name="isFullTank"
-              label="是否加满/跳枪"
-              valuePropName="checked"
-              className="mb-0"
-            >
-              <Switch />
-            </Form.Item>
-
-            <Form.Item
-              name="isLowFuelLight"
-              label="加油前油灯是否亮"
-              valuePropName="checked"
-              className="mb-0"
-            >
-              <Switch />
-            </Form.Item>
-
-            <Form.Item
-              name="isMissedPrevious"
-              label="是否漏记上次"
-              valuePropName="checked"
-              className="mb-0"
-            >
-              <Switch />
-            </Form.Item>
-          </div>
-        </Card>
-
-        <Card title="备注" className="mb-4">
-          <Form.Item name="note" className="mb-0">
-            <Input.TextArea
-              rows={3}
-              placeholder="记录加油时的其他信息（可选）"
-              maxLength={200}
-              showCount
+          <Form.Item
+            name="currentMileage"
+            label="当前里程"
+            rules={[{ required: true, message: '请输入当前里程' }]}
+          >
+            <InputNumber
+              min={0}
+              className="w-full"
+              placeholder="请输入里程"
+              addonAfter="公里"
             />
           </Form.Item>
         </Card>
 
-        <div className="flex gap-4 justify-end">
-          <Button onClick={() => navigate('/refuel')}>取消</Button>
-          <Button type="primary" htmlType="submit" loading={submitting}>
-            添加记录
-          </Button>
-        </div>
+        <Card className="mb-3 shadow-sm">
+          {/* 机显单价 × 加油量 = 机显金额 */}
+          <div className="flex items-end gap-2 mb-4">
+            <Form.Item
+              name="unitPrice"
+              label="机显单价"
+              rules={[{ required: true, message: '请输入单价' }]}
+              className="flex-1 mb-0"
+            >
+              <InputNumber
+                min={0}
+                step={0.01}
+                className="w-full text-lg font-bold"
+                placeholder="0.00"
+                addonAfter="元/升"
+              />
+            </Form.Item>
+            <span className="text-gray-400 pb-2">×</span>
+            <Form.Item
+              name="fuelAmount"
+              label="加油量"
+              rules={[{ required: true, message: '请输入加油量' }]}
+              className="flex-1 mb-0"
+            >
+              <InputNumber
+                min={0}
+                step={0.01}
+                className="w-full text-lg font-bold"
+                placeholder="0.00"
+                addonAfter="升"
+              />
+            </Form.Item>
+            <span className="text-gray-400 pb-2">=</span>
+            <Form.Item
+              label="机显金额"
+              className="flex-1 mb-0"
+            >
+              <InputNumber
+                value={displayTotalCost}
+                disabled
+                className="w-full text-lg font-bold"
+                addonAfter="元"
+              />
+            </Form.Item>
+          </div>
+
+          {/* 实付单价 / 优惠金额 / 实付金额 */}
+          <div className="flex items-end gap-2">
+            <Form.Item label="实付单价" className="flex-1 mb-0">
+              <InputNumber
+                value={actualUnitPrice}
+                disabled
+                className="w-full text-green-600 font-bold"
+                placeholder="自动计算"
+                addonAfter="元/升"
+              />
+            </Form.Item>
+            <Form.Item
+              name="discount"
+              label="优惠金额"
+              initialValue={0}
+              className="flex-1 mb-0"
+            >
+              <InputNumber
+                min={0}
+                step={0.01}
+                className="w-full"
+                placeholder="0.00"
+                addonAfter="元"
+              />
+            </Form.Item>
+            <Form.Item label="实付金额" className="flex-1 mb-0">
+              <InputNumber
+                value={actualCost}
+                disabled
+                className="w-full text-green-600 font-bold"
+                addonAfter="元"
+              />
+            </Form.Item>
+          </div>
+        </Card>
+
+        <Card className="mb-3 shadow-sm">
+          <Form.Item
+            name="isFullTank"
+            label="是否加满？"
+            rules={[{ required: true }]}
+            className="mb-4"
+          >
+            <Radio.Group buttonStyle="solid" className="w-full">
+              <Radio.Button value={true} className="w-1/2 text-center">加满</Radio.Button>
+              <Radio.Button value={false} className="w-1/2 text-center">没加满</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+
+          <Form.Item
+            name="isLowFuelLight"
+            label="油量警告灯亮了吗？"
+            rules={[{ required: true }]}
+            className="mb-4"
+          >
+            <Radio.Group buttonStyle="solid" className="w-full">
+              <Radio.Button value={true} className="w-1/2 text-center">油灯亮</Radio.Button>
+              <Radio.Button value={false} className="w-1/2 text-center">没有亮</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+
+          <Form.Item
+            name="stationName"
+            label="加油站"
+          >
+            <Input placeholder="请选择或输入加油站" />
+          </Form.Item>
+
+          <Form.Item
+            name="fuelType"
+            label="燃油标号"
+            rules={[{ required: true }]}
+          >
+            <Select options={fuelTypeOptions} placeholder="请选择燃油标号" />
+          </Form.Item>
+
+          <Form.Item
+            name="isMissedPrevious"
+            label="上次记录了吗"
+            rules={[{ required: true }]}
+          >
+            <Radio.Group buttonStyle="solid" className="w-full">
+              <Radio.Button value={false} className="w-1/2 text-center">记录了</Radio.Button>
+              <Radio.Button value={true} className="w-1/2 text-center">没记录</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+        </Card>
+
+        <Card className="mb-3 shadow-sm">
+          <Form.Item name="note" label="备注" className="mb-0">
+            <Input.TextArea
+              rows={3}
+              placeholder="请输入备注"
+              maxLength={1000}
+              showCount
+            />
+          </Form.Item>
+          <div className="mt-4 flex flex-col items-center justify-center py-6 border-2 border-dashed border-gray-200 rounded-lg text-gray-400 cursor-pointer hover:border-blue-300 hover:text-blue-400 transition">
+            <CameraOutlined style={{ fontSize: 32 }} />
+            <span className="mt-2">拍照备忘</span>
+          </div>
+        </Card>
       </Form>
     </div>
   );
