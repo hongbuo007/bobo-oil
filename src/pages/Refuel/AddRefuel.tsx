@@ -9,6 +9,7 @@ import {
   DatePicker,
   Radio,
   Button,
+  AutoComplete,
   message,
 } from 'antd';
 import { ArrowLeftOutlined, CameraOutlined, QuestionCircleOutlined } from '@ant-design/icons';
@@ -81,6 +82,13 @@ export default function AddRefuel() {
     }
     return 0;
   }, [actualCost, formValues.fuelAmount]);
+
+  // 从历史记录提取去重的加油站列表作为选项
+  const stationOptions = useMemo(() => {
+    const names = new Set<string>();
+    records.forEach(r => { if (r.stationName) names.add(r.stationName); });
+    return Array.from(names).map(name => ({ value: name }));
+  }, [records]);
 
   const handleSubmit = async (values: any) => {
     if (!currentVehicleId) {
@@ -283,7 +291,14 @@ export default function AddRefuel() {
             name="stationName"
             label="加油站"
           >
-            <Input placeholder="请选择或输入加油站" />
+            <AutoComplete
+              options={stationOptions}
+              placeholder="输入或选择加油站"
+              allowClear
+              filterOption={(inputValue, option) =>
+                option!.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+              }
+            />
           </Form.Item>
 
           <Form.Item
