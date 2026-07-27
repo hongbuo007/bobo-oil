@@ -93,6 +93,18 @@ export default function AddRefuel() {
     [form]
   );
 
+  // 计算实付单价：实付金额 / 加油量
+  const calcActualUnitPrice = () => {
+    const discount = form.getFieldValue('discount') || 0;
+    const fuelAmount = form.getFieldValue('fuelAmount');
+    const totalCost = form.getFieldValue('totalCost') || 0;
+    const actualCost = totalCost - discount;
+    if (fuelAmount && fuelAmount > 0 && actualCost > 0) {
+      return Math.round((actualCost / fuelAmount) * 1000) / 1000;
+    }
+    return undefined;
+  };
+
   const handleSubmit = async (values: any) => {
     if (!currentVehicleId) {
       message.error('请先选择车辆');
@@ -150,7 +162,7 @@ export default function AddRefuel() {
             <Form.Item
               name="date"
               label="加油日期"
-              rules={[{ required: true, message: '请选择加油日期' }]}
+              rules={[{ required: true, message: '请选择加���日期' }]}
               getValueFromEvent={(date: dayjs.Dayjs | null) =>
                 date ? date.format('YYYY-MM-DD') : ''
               }
@@ -191,7 +203,7 @@ export default function AddRefuel() {
         </Card>
 
         <Card title="加油数据" className="mb-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-0">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-0">
             <Form.Item
               name="fuelAmount"
               label="加油量(L)"
@@ -208,7 +220,7 @@ export default function AddRefuel() {
 
             <Form.Item
               name="unitPrice"
-              label="单价(元/L)"
+              label="机显单价(元/L)"
               rules={[{ required: true, message: '请输入单价' }]}
             >
               <InputNumber
@@ -217,6 +229,15 @@ export default function AddRefuel() {
                 className="w-full"
                 placeholder={lastRecord ? `上次：${lastRecord.unitPrice.toFixed(2)}` : '0.00'}
                 onChange={handleUnitPriceChangeTriple}
+              />
+            </Form.Item>
+
+            <Form.Item label="实付单价(元/L)">
+              <InputNumber
+                value={calcActualUnitPrice()}
+                disabled
+                className="w-full text-green-600 font-bold"
+                placeholder="自动计算"
               />
             </Form.Item>
 
