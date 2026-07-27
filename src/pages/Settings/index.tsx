@@ -447,7 +447,7 @@ export default function SettingsPage() {
       }
       const csv = generateCSV(records);
       const timestamp = new Date().toISOString().slice(0, 10);
-      downloadFile(csv, `bobo油耗-加油记录-${timestamp}.csv`, 'text/csv;charset=utf-8');
+      downloadFile(csv, `BOBO油耗-加油记录-${timestamp}.csv`, 'text/csv;charset=utf-8');
       message.success(`已导出 ${records.length} 条记录`);
     } catch (err) {
       message.error('导出失败');
@@ -464,7 +464,7 @@ export default function SettingsPage() {
       }
       const json = JSON.stringify(records, null, 2);
       const timestamp = new Date().toISOString().slice(0, 10);
-      downloadFile(json, `bobo油耗-加油记录-${timestamp}.json`, 'application/json');
+      downloadFile(json, `BOBO油耗-加油记录-${timestamp}.json`, 'application/json');
       message.success(`已导出 ${records.length} 条记录`);
     } catch (err) {
       message.error('导出失败');

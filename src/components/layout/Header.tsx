@@ -1,5 +1,6 @@
 import { Select } from 'antd';
 import { useVehicleStore } from '@/stores/useVehicleStore';
+import { APP_NAME } from '@/config/constants';
 
 export default function Header() {
   const vehicles = useVehicleStore((s) => s.vehicles);
@@ -15,7 +16,7 @@ export default function Header() {
     <div className="flex items-center justify-between h-14 px-4 bg-white border-b border-gray-100">
       <div className="flex items-center gap-2">
         <span className="text-lg">⛽</span>
-        <span className="text-base font-semibold text-gray-800">bobo油耗</span>
+        <span className="text-base font-semibold text-gray-800">{APP_NAME}</span>
       </div>
 
       <div>

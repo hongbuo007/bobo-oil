@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Button } from 'antd';
+import { APP_NAME } from '@/config/constants';
 import {
   DashboardOutlined,
   ThunderboltOutlined,
@@ -90,7 +91,7 @@ export default function AppLayout() {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-center h-16 border-b border-gray-100">
             <span className={`font-bold text-blue-500 whitespace-nowrap ${collapsed ? 'text-lg' : 'text-xl'}`}>
-              {collapsed ? '⛽' : '⛽ bobo油耗'}
+              {collapsed ? '⛽' : `⛽ ${APP_NAME}`}
             </span>
           </div>
 

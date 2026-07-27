@@ -32,7 +32,7 @@ if (require('fs').existsSync(distPath)) {
 }
 
 app.listen(PORT, () => {
-  console.log(`🚗 bobo油耗服务端已启动: http://localhost:${PORT}`);
+  console.log(`🚗 BOBO油耗服务端已启动: http://localhost:${PORT}`);
   console.log(`   API: http://localhost:${PORT}/api`);
   console.log(`   前端: http://localhost:${PORT}`);
 

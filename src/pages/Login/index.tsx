@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, Form, Input, Button, Typography, message, Spin } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { APP_NAME } from '@/config/constants';
 
 const { Title, Text } = Typography;
 
@@ -55,7 +56,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">⛽</div>
-          <Title level={3} className="!mb-1">bobo油耗</Title>
+          <Title level={3} className="!mb-1">{APP_NAME}</Title>
           <Text type="secondary">车辆油耗管理系统</Text>
         </div>
 

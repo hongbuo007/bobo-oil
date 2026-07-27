@@ -47,6 +47,6 @@ export const ALGORITHM_NAMES: Record<number, string> = {
 };
 
 // 应用常量
-export const APP_NAME = 'bobo油耗';
+export const APP_NAME = 'BOBO油耗';
 export const APP_VERSION = '1.0.0';
 export const DB_NAME = 'BoboOilDB';
