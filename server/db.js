@@ -16,7 +16,10 @@ db.pragma('journal_mode = WAL');
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY DEFAULT 'default',
-    password_hash TEXT NOT NULL,
+    password_hash TEXT NOT NULL DEFAULT '',
+    openid TEXT,
+    nickname TEXT DEFAULT '',
+    avatar_url TEXT DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -73,6 +76,10 @@ try {
 try {
   db.exec(`ALTER TABLE refuel_records ADD COLUMN actual_cost REAL NOT NULL DEFAULT 0`);
 } catch {}
+// 迁移：给 users 表添加 openid/nickname/avatar_url 列
+try { db.exec(`ALTER TABLE users ADD COLUMN openid TEXT`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN nickname TEXT DEFAULT ''`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''`); } catch {}
 // 初始化旧数据的 actual_cost = total_cost
 db.exec(`UPDATE refuel_records SET actual_cost = total_cost WHERE actual_cost = 0 AND total_cost > 0`);
 

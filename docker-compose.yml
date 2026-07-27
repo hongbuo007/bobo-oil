@@ -12,3 +12,6 @@ services:
     environment:
       - JWT_SECRET=bobo-oil-production-secret-change-me
       - TZ=Asia/Shanghai
+      # 微信小程序配置（需要在微信公众平台获取）
+      - WECHAT_APPID=
+      - WECHAT_SECRET=
