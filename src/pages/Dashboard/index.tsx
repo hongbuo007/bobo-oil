@@ -67,9 +67,8 @@ export default function DashboardPage() {
 
   const barData = useMemo(() => {
     return monthlyStats.map((m) => ({
-      month: m.month.substring(5) + '月',
+      month: m.month,
       cost: Math.round(m.totalCost * 100) / 100,
-      displayCost: `¥${Math.round(m.totalCost * 100) / 100}`,
     }));
   }, [monthlyStats]);
 
@@ -221,10 +220,11 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <XAxis dataKey="month" tickFormatter={(v) => `${v.substring(5)}月`} tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `¥${v}`} />
                     <RechartsTooltip
                       formatter={(value) => [`¥${Number(value).toFixed(2)}`, '油费']}
+                      labelFormatter={(label) => `${(label as string).substring(5)}月`}
                     />
                     <Bar dataKey="cost" fill="#52c41a" radius={[6, 6, 0, 0]} name="油费">
                       <LabelList dataKey="cost" position="top" style={{ fontSize: 11, fill: '#666' }} formatter={(v: any) => `¥${Math.round(Number(v || 0) * 100) / 100}`} />
