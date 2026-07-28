@@ -217,14 +217,14 @@ export default function DashboardPage() {
             <Col xs={24} lg={12}>
               <Card title="月度油费" className="h-full">
                 <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={barData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `¥${v}`} />
                     <RechartsTooltip
                       formatter={(value) => [`¥${Number(value).toFixed(2)}`, '油费']}
                     />
-                    <Bar dataKey="cost" fill="#52c41a" radius={[6, 6, 0, 0]} name="油费" />
+                    <Bar dataKey="cost" fill="#52c41a" radius={[6, 6, 0, 0]} name="油费" label={{ position: 'top', fontSize: 11, fill: '#666', formatter: (v: any) => Number(v) > 0 ? `¥${Number(v).toFixed(0)}` : '' }} />
                   </BarChart>
                 </ResponsiveContainer>
               </Card>
