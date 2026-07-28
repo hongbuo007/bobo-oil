@@ -69,6 +69,7 @@ export default function DashboardPage() {
     return monthlyStats.map((m) => ({
       month: m.month.substring(5) + '月',
       cost: Math.round(m.totalCost * 100) / 100,
+      displayCost: `¥${Math.round(m.totalCost * 100) / 100}`,
     }));
   }, [monthlyStats]);
 
@@ -226,7 +227,7 @@ export default function DashboardPage() {
                       formatter={(value) => [`¥${Number(value).toFixed(2)}`, '油费']}
                     />
                     <Bar dataKey="cost" fill="#52c41a" radius={[6, 6, 0, 0]} name="油费">
-                      <LabelList dataKey="cost" position="top" style={{ fontSize: 11, fill: '#666' }} formatter={(v: any) => `¥${Number(v).toFixed(0)}`} />
+                      <LabelList dataKey="cost" position="top" style={{ fontSize: 11, fill: '#666' }} formatter={(v: any) => `¥${Math.round(Number(v || 0) * 100) / 100}`} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
