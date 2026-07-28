@@ -90,7 +90,7 @@ export default function AppLayout() {
       >
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-center h-16 border-b border-gray-100">
-            <span className={`font-bold text-blue-500 whitespace-nowrap ${collapsed ? 'text-lg' : 'text-xl'}`}>
+            <span className={`font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-400 whitespace-nowrap ${collapsed ? 'text-lg' : 'text-xl'}`}>
               {collapsed ? '⛽' : `⛽ ${APP_NAME}`}
             </span>
           </div>

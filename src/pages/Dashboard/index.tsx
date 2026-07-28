@@ -11,7 +11,17 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
+  Area,
+  AreaChart,
 } from 'recharts';
+import {
+  DashboardOutlined,
+  FireOutlined,
+  DollarOutlined,
+  CarOutlined,
+  ThunderboltOutlined,
+  RiseOutlined,
+} from '@ant-design/icons';
 import { useVehicleStore } from '@/stores/useVehicleStore';
 import { useRefuelStore } from '@/stores/useRefuelStore';
 import { calculateDashboardStats, calculateMonthlyStats } from '@/services/costCalculator';
@@ -56,8 +66,8 @@ export default function DashboardPage() {
 
   const barData = useMemo(() => {
     return monthlyStats.map((m) => ({
-      month: m.month,
-      cost: m.totalCost,
+      month: m.month.substring(5) + '月',
+      cost: Math.round(m.totalCost * 100) / 100,
     }));
   }, [monthlyStats]);
 
@@ -76,12 +86,12 @@ export default function DashboardPage() {
 
   if (vehicles.length === 0) {
     return (
-      <div className="p-6">
+      <div className="p-6 page-enter">
         <EmptyState
           title="还没有添加车辆"
           description="添加您的第一辆车，开始记录油耗数据"
           action={
-            <Button type="primary" onClick={() => navigate('/vehicles/add')}>
+            <Button type="primary" size="large" onClick={() => navigate('/vehicles/add')}>
               添加车辆
             </Button>
           }
@@ -91,17 +101,25 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* 车辆切换器 */}
-      <div className="flex items-center gap-3">
-        <span className="text-gray-500 text-sm whitespace-nowrap">当前车辆：</span>
+    <div className="p-6 space-y-6 page-enter">
+      {/* 顶部横幅 */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 m-0">
+            {currentVehicle ? `${currentVehicle.brand} ${currentVehicle.model}` : '仪表盘'}
+          </h1>
+          <p className="text-sm text-gray-400 mt-1 m-0">
+            {currentVehicle?.licensePlate || '选择车辆查看数据'}
+          </p>
+        </div>
         <Select
-          className="min-w-[240px]"
+          className="min-w-[220px]"
+          size="large"
           value={currentVehicleId}
           onChange={handleVehicleChange}
-          placeholder="请选择车辆"
+          placeholder="选择车辆"
           options={vehicles.map((v) => ({
-            label: `${v.brand} ${v.model} (${v.licensePlate})`,
+            label: `${v.name || v.brand} ${v.licensePlate ? `(${v.licensePlate})` : ''}`,
             value: v.id,
           }))}
         />
@@ -114,10 +132,10 @@ export default function DashboardPage() {
       ) : !currentVehicle ? null : records.length === 0 ? (
         <EmptyState
           title="暂无加油记录"
-          description={`${currentVehicle.brand} ${currentVehicle.model} 还没有加油记录，开始记录您的第一笔加油数据`}
+          description={`${currentVehicle.brand} ${currentVehicle.model} 还没有加油记录`}
           action={
-            <Button type="primary" onClick={() => navigate('/refuel/add')}>
-              添加加油记录
+            <Button type="primary" size="large" onClick={() => navigate('/refuel/add')}>
+              添加第一条记录
             </Button>
           }
         />
@@ -125,98 +143,96 @@ export default function DashboardPage() {
         <>
           {/* 核心指标卡 */}
           <Row gutter={[16, 16]}>
-            <Col xs={12} sm={12} md={6}>
+            <Col xs={12} sm={6}>
               <StatCard
                 title="最新油耗"
                 value={stats.latestConsumption !== null ? formatNumber(stats.latestConsumption) : '--'}
                 unit="L/100km"
                 color="blue"
+                icon={<ThunderboltOutlined />}
               />
             </Col>
-            <Col xs={12} sm={12} md={6}>
+            <Col xs={12} sm={6}>
               <StatCard
                 title="平均油耗"
                 value={stats.avgConsumption !== null ? formatNumber(stats.avgConsumption) : '--'}
                 unit="L/100km"
                 color="green"
+                icon={<RiseOutlined />}
               />
             </Col>
-            <Col xs={12} sm={12} md={6}>
+            <Col xs={12} sm={6}>
               <StatCard
                 title="本月油费"
                 value={formatMoney(stats.monthlyCost)}
                 color="orange"
+                icon={<DollarOutlined />}
               />
             </Col>
-            <Col xs={12} sm={12} md={6}>
+            <Col xs={12} sm={6}>
               <StatCard
                 title="每公里成本"
                 value={stats.costPerKm !== null ? formatNumber(stats.costPerKm, 2) : '--'}
                 unit="元/km"
                 color="red"
+                icon={<FireOutlined />}
               />
             </Col>
           </Row>
 
-          {/* 油耗趋势图 */}
-          <Card title="油耗趋势" className="w-full">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={trendData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis unit=" L" tick={{ fontSize: 12 }} />
-                <RechartsTooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length > 0) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
-                          <div className="text-sm text-gray-500">{data.fullDate}</div>
-                          <div className="text-lg font-bold" style={{ color: '#1890FF' }}>
-                            {data.consumption} L/100km
-                          </div>
-                          {data.algorithm && (
-                            <div className="text-xs text-gray-400 mt-1">
-                              算法：{ALGORITHM_NAMES[data.algorithm] || `算法${data.algorithm}`}
+          {/* 图表区 */}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card title="油耗趋势" className="h-full">
+                <ResponsiveContainer width="100%" height={280}>
+                  <AreaChart data={trendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="colorConsumption" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#1677ff" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#1677ff" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis unit=" L" tick={{ fontSize: 12 }} />
+                    <RechartsTooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length > 0) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-100">
+                              <div className="text-xs text-gray-400">{data.fullDate}</div>
+                              <div className="text-lg font-bold text-blue-600">{data.consumption} L/100km</div>
                             </div>
-                          )}
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="consumption"
-                  stroke="#1890FF"
-                  strokeWidth={2}
-                  dot={{ fill: '#1890FF', r: 4 }}
-                  activeDot={{ r: 6 }}
-                  name="油耗"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </Card>
-
-          {/* 月度油费柱状图 */}
-          <Card title="月度油费统计" className="w-full">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={barData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <RechartsTooltip
-                  formatter={(value) => [`¥${Number(value).toFixed(2)}`, '油费']}
-                  labelFormatter={(label) => `${label}`}
-                />
-                <Bar dataKey="cost" fill="#52C41A" radius={[4, 4, 0, 0]} name="油费" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area type="monotone" dataKey="consumption" stroke="#1677ff" strokeWidth={2.5} fill="url(#colorConsumption)" dot={{ fill: '#1677ff', r: 3 }} activeDot={{ r: 5, strokeWidth: 2 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card title="月度油费" className="h-full">
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={barData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <RechartsTooltip
+                      formatter={(value) => [`¥${Number(value).toFixed(2)}`, '油费']}
+                    />
+                    <Bar dataKey="cost" fill="#52c41a" radius={[6, 6, 0, 0]} name="油费" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+          </Row>
 
           {/* 最近加油记录 */}
-          <Card title="最近加油记录">
+          <Card title="最近加油记录" extra={<Button type="link" size="small" onClick={() => navigate('/refuel')}>查看全部</Button>}>
             <Table
               dataSource={recentRecords}
               rowKey="id"
@@ -231,32 +247,40 @@ export default function DashboardPage() {
                   title: '日期',
                   dataIndex: 'date',
                   key: 'date',
+                  width: 110,
                   render: (v: string) => formatDate(v),
                 },
                 {
                   title: '里程',
                   dataIndex: 'currentMileage',
                   key: 'currentMileage',
+                  width: 110,
                   render: (v: number) => `${v.toLocaleString('zh-CN')} km`,
                 },
                 {
                   title: '加油量',
                   dataIndex: 'fuelAmount',
                   key: 'fuelAmount',
+                  width: 90,
                   render: (v: number) => `${v.toFixed(2)} L`,
                 },
                 {
                   title: '金额',
-                  dataIndex: 'totalCost',
-                  key: 'totalCost',
-                  render: (v: number) => formatMoney(v),
+                  dataIndex: 'actualCost',
+                  key: 'actualCost',
+                  width: 100,
+                  render: (_: unknown, r: RefuelRecord) => {
+                    const actual = r.actualCost ?? r.totalCost ?? 0;
+                    return <span className="font-medium">{formatMoney(actual)}</span>;
+                  },
                 },
                 {
                   title: '油耗',
                   dataIndex: 'calculatedConsumption',
                   key: 'calculatedConsumption',
+                  width: 110,
                   render: (v: number | null) => (
-                    <span className={v !== null ? 'font-medium' : 'text-gray-300'}>
+                    <span className={`font-semibold ${v !== null ? (v < 7 ? 'consumption-low' : v < 9 ? 'consumption-normal' : v < 12 ? 'consumption-high' : 'consumption-very-high') : 'text-gray-300'}`}>
                       {formatConsumption(v)}
                     </span>
                   ),

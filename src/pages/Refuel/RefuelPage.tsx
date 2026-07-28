@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Button, Popconfirm, message, Card, Space, Tag } from 'antd';
-import { PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Popconfirm, message, Card, Space, Tag, Row, Col } from 'antd';
+import { PlusOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useVehicleStore } from '@/stores/useVehicleStore';
 import { useRefuelStore } from '@/stores/useRefuelStore';
@@ -45,7 +45,8 @@ export default function RefuelPage() {
   const summary = useMemo(() => {
     const totalAmount = records.reduce((sum, r) => sum + r.fuelAmount, 0);
     const totalCost = records.reduce((sum, r) => sum + (r.actualCost ?? r.totalCost ?? 0), 0);
-    return { totalAmount, totalCost };
+    const totalDiscount = records.reduce((sum, r) => sum + (r.discount || 0), 0);
+    return { totalAmount, totalCost, totalDiscount };
   }, [records]);
 
   const columns: ColumnsType<RefuelRecord> = [
@@ -54,7 +55,7 @@ export default function RefuelPage() {
       dataIndex: 'date',
       key: 'date',
       width: 110,
-      render: (date: string) => formatDate(date),
+      render: (date: string) => <span className="font-medium">{formatDate(date)}</span>,
       sorter: (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
       defaultSortOrder: 'descend',
     },
@@ -62,42 +63,50 @@ export default function RefuelPage() {
       title: '里程',
       dataIndex: 'currentMileage',
       key: 'currentMileage',
-      width: 100,
+      width: 105,
       render: (val: number) => formatMileage(val),
     },
     {
-      title: '加油量(L)',
+      title: '加油量',
       dataIndex: 'fuelAmount',
       key: 'fuelAmount',
-      width: 100,
-      render: (val: number) => val.toFixed(2),
+      width: 90,
+      render: (val: number) => `${val.toFixed(2)} L`,
     },
     {
       title: '单价',
       dataIndex: 'unitPrice',
       key: 'unitPrice',
-      width: 90,
-      render: (val: number) => formatMoney(val),
+      width: 85,
+      render: (val: number) => <span className="text-gray-500">{formatMoney(val)}</span>,
     },
     {
-      title: '金额',
+      title: '实付金额',
       key: 'totalCost',
-      width: 100,
+      width: 110,
       render: (_: unknown, r: RefuelRecord) => {
         const actual = r.actualCost ?? r.totalCost ?? 0;
-        return <span>{formatMoney(actual)}{r.discount > 0 ? <span className="text-xs text-green-500 ml-1">省{r.discount.toFixed(0)}</span> : null}</span>;
+        return (
+          <span>
+            <span className="font-semibold">{formatMoney(actual)}</span>
+            {r.discount > 0 && (
+              <span className="text-xs text-green-600 ml-1">省{r.discount.toFixed(0)}</span>
+            )}
+          </span>
+        );
       },
-      sorter: (a: RefuelRecord, b: RefuelRecord) => (a.actualCost ?? a.totalCost ?? 0) - (b.actualCost ?? b.totalCost ?? 0),
+      sorter: (a: RefuelRecord, b: RefuelRecord) =>
+        (a.actualCost ?? a.totalCost ?? 0) - (b.actualCost ?? b.totalCost ?? 0),
     },
     {
       title: '油耗',
       dataIndex: 'calculatedConsumption',
       key: 'calculatedConsumption',
-      width: 110,
+      width: 120,
       render: (val: number | null) => {
         if (val === null) return <span className="text-gray-300">--</span>;
         return (
-          <span className={`font-medium ${getConsumptionColorClass(val)}`}>
+          <span className={`font-semibold ${getConsumptionColorClass(val)}`}>
             {formatConsumption(val)}
           </span>
         );
@@ -107,18 +116,18 @@ export default function RefuelPage() {
       title: '算法',
       dataIndex: 'algorithmUsed',
       key: 'algorithmUsed',
-      width: 120,
+      width: 130,
       render: (val: number | null) => {
         if (val === null) return <span className="text-gray-300">--</span>;
         return (
-          <Tag color="blue">{ALGORITHM_NAMES[val] || `算法${val}`}</Tag>
+          <Tag color="processing">{ALGORITHM_NAMES[val] || `算法${val}`}</Tag>
         );
       },
     },
     {
       title: '操作',
       key: 'action',
-      width: 160,
+      width: 100,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
@@ -127,9 +136,7 @@ export default function RefuelPage() {
             size="small"
             icon={<EyeOutlined />}
             onClick={() => navigate(`/refuel/${record.id}`)}
-          >
-            详情
-          </Button>
+          />
           <Popconfirm
             title="确认删除"
             description="确定要删除这条加油记录吗？"
@@ -138,9 +145,7 @@ export default function RefuelPage() {
             cancelText="取消"
             okButtonProps={{ danger: true }}
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
+            <Button type="link" size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
       ),
@@ -149,12 +154,12 @@ export default function RefuelPage() {
 
   if (!currentVehicleId || !currentVehicle) {
     return (
-      <div className="p-4">
+      <div className="p-4 page-enter">
         <EmptyState
           title="请先添加车辆"
           description="您需要先添加一辆车，才能记录加油数据"
           action={
-            <Button type="primary" onClick={() => navigate('/vehicles/add')}>
+            <Button type="primary" size="large" onClick={() => navigate('/vehicles/add')}>
               添加车辆
             </Button>
           }
@@ -164,16 +169,17 @@ export default function RefuelPage() {
   }
 
   return (
-    <div className="p-4">
+    <div className="p-4 page-enter">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-lg font-bold text-gray-800 m-0">加油记录</h1>
+          <h1 className="text-xl font-bold text-gray-900 m-0">加油记录</h1>
           <p className="text-sm text-gray-400 mt-1 m-0">
             {currentVehicle.brand} {currentVehicle.model} · {currentVehicle.licensePlate}
           </p>
         </div>
         <Button
           type="primary"
+          size="large"
           icon={<PlusOutlined />}
           onClick={() => navigate('/refuel/add')}
         >
@@ -186,7 +192,7 @@ export default function RefuelPage() {
           title="还没有加油记录"
           description="记录您的第一笔加油，开始计算油耗"
           action={
-            <Button type="primary" onClick={() => navigate('/refuel/add')}>
+            <Button type="primary" size="large" onClick={() => navigate('/refuel/add')}>
               添加第一条记录
             </Button>
           }
@@ -198,7 +204,7 @@ export default function RefuelPage() {
             dataSource={records}
             rowKey="id"
             loading={loading}
-            scroll={{ x: 900 }}
+            scroll={{ x: 950 }}
             pagination={{
               pageSize: 15,
               showSizeChanger: true,
@@ -208,22 +214,32 @@ export default function RefuelPage() {
           />
 
           {records.length > 0 && (
-            <Card className="mt-4" size="small">
-              <div className="flex flex-wrap gap-6">
-                <div>
-                  <span className="text-sm text-gray-400">累计加油量：</span>
-                  <span className="text-base font-semibold text-gray-800">
-                    {summary.totalAmount.toFixed(2)} L
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-400">累计金额：</span>
-                  <span className="text-base font-semibold text-orange-500">
-                    {formatMoney(summary.totalCost)}
-                  </span>
-                </div>
-              </div>
-            </Card>
+            <Row gutter={[16, 16]} className="mt-4">
+              <Col xs={12} sm={6}>
+                <Card size="small" className="text-center">
+                  <div className="text-xs text-gray-400 mb-1">累计加油量</div>
+                  <div className="text-lg font-bold text-blue-600">{summary.totalAmount.toFixed(1)} L</div>
+                </Card>
+              </Col>
+              <Col xs={12} sm={6}>
+                <Card size="small" className="text-center">
+                  <div className="text-xs text-gray-400 mb-1">累计实付</div>
+                  <div className="text-lg font-bold text-orange-500">{formatMoney(summary.totalCost)}</div>
+                </Card>
+              </Col>
+              <Col xs={12} sm={6}>
+                <Card size="small" className="text-center">
+                  <div className="text-xs text-gray-400 mb-1">累计优惠</div>
+                  <div className="text-lg font-bold text-green-600">{formatMoney(summary.totalDiscount)}</div>
+                </Card>
+              </Col>
+              <Col xs={12} sm={6}>
+                <Card size="small" className="text-center">
+                  <div className="text-xs text-gray-400 mb-1">记录次数</div>
+                  <div className="text-lg font-bold text-gray-700">{records.length} 次</div>
+                </Card>
+              </Col>
+            </Row>
           )}
         </>
       )}

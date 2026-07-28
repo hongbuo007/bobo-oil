@@ -3,8 +3,18 @@ import { Card, Row, Col, Select, Table, Segmented } from 'antd';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  ResponsiveContainer, Legend,
+  ResponsiveContainer, AreaChart, Area,
 } from 'recharts';
+import {
+  DollarOutlined,
+  ThunderboltOutlined,
+  GiftOutlined,
+  CarOutlined,
+  RiseOutlined,
+  FireOutlined,
+  DashboardOutlined,
+  OrderedListOutlined,
+} from '@ant-design/icons';
 import { useVehicleStore } from '@/stores/useVehicleStore';
 import { useRefuelStore } from '@/stores/useRefuelStore';
 import { calculateMonthlyStats } from '@/services/costCalculator';
@@ -188,30 +198,30 @@ export default function StatisticsPage() {
           {/* 汇总指标卡 */}
           <Row gutter={[16, 16]}>
             <Col xs={12} sm={6}>
-              <StatCard title="累计油费" value={summary.totalCost.toFixed(2)} prefix="¥" color="orange" />
+              <StatCard title="累计油费" value={summary.totalCost.toFixed(2)} prefix="¥" color="orange" icon={<DollarOutlined />} />
             </Col>
             <Col xs={12} sm={6}>
-              <StatCard title="累计加油" value={summary.totalFuel.toFixed(0)} unit="L" color="blue" />
+              <StatCard title="累计加油" value={summary.totalFuel.toFixed(0)} unit="L" color="blue" icon={<ThunderboltOutlined />} />
             </Col>
             <Col xs={12} sm={6}>
-              <StatCard title="累计优惠" value={summary.totalDiscount.toFixed(2)} prefix="¥" color="green" />
+              <StatCard title="累计优惠" value={summary.totalDiscount.toFixed(2)} prefix="¥" color="green" icon={<GiftOutlined />} />
             </Col>
             <Col xs={12} sm={6}>
-              <StatCard title="累计里程" value={summary.totalMileage.toLocaleString()} unit="km" color="blue" />
+              <StatCard title="累计里程" value={summary.totalMileage.toLocaleString()} unit="km" color="blue" icon={<CarOutlined />} />
             </Col>
           </Row>
           <Row gutter={[16, 16]}>
             <Col xs={12} sm={6}>
-              <StatCard title="平均油耗" value={summary.avgConsumption?.toFixed(2) ?? '--'} unit="L/100km" color="green" />
+              <StatCard title="平均油耗" value={summary.avgConsumption?.toFixed(2) ?? '--'} unit="L/100km" color="green" icon={<RiseOutlined />} />
             </Col>
             <Col xs={12} sm={6}>
-              <StatCard title="每公里成本" value={summary.avgCostPerKm?.toFixed(2) ?? '--'} unit="元/km" color="red" />
+              <StatCard title="每公里成本" value={summary.avgCostPerKm?.toFixed(2) ?? '--'} unit="元/km" color="red" icon={<FireOutlined />} />
             </Col>
             <Col xs={12} sm={6}>
-              <StatCard title="日均行程" value={summary.avgTripDistance > 0 ? summary.avgTripDistance.toFixed(0) : '--'} unit="km/天" color="blue" />
+              <StatCard title="日均行程" value={summary.avgTripDistance > 0 ? summary.avgTripDistance.toFixed(0) : '--'} unit="km/天" color="blue" icon={<DashboardOutlined />} />
             </Col>
             <Col xs={12} sm={6}>
-              <StatCard title="记录次数" value={records.length} unit="次" color="green" />
+              <StatCard title="记录次数" value={records.length} unit="次" color="green" icon={<OrderedListOutlined />} />
             </Col>
           </Row>
 
