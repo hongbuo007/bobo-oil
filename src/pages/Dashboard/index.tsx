@@ -11,6 +11,7 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
+  LabelList,
   Area,
   AreaChart,
 } from 'recharts';
@@ -224,7 +225,9 @@ export default function DashboardPage() {
                     <RechartsTooltip
                       formatter={(value) => [`¥${Number(value).toFixed(2)}`, '油费']}
                     />
-                    <Bar dataKey="cost" fill="#52c41a" radius={[6, 6, 0, 0]} name="油费" label={{ position: 'top', fontSize: 11, fill: '#666', formatter: (v: any) => Number(v) > 0 ? `¥${Number(v).toFixed(0)}` : '' }} />
+                    <Bar dataKey="cost" fill="#52c41a" radius={[6, 6, 0, 0]} name="油费">
+                      <LabelList dataKey="cost" position="top" style={{ fontSize: 11, fill: '#666' }} formatter={(v: any) => `¥${Number(v).toFixed(0)}`} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </Card>
